@@ -3,9 +3,9 @@ import { GOLDEN_CASES } from '@/src/contexts/portrait-analysis/__tests__/regress
 import { runPortraitAnalysis } from '@/src/contexts/portrait-analysis/__tests__/regression/helpers';
 
 describe('portrait pipeline compatibility regression', () => {
-  test('AnalyzeIdentityCluster and ComposePortraitReport remain compatible with the existing UI-facing envelope', () => {
+  test('AnalyzeIdentityCluster and ComposePortraitReport remain compatible with the existing UI-facing envelope', async () => {
     for (const goldenCase of GOLDEN_CASES) {
-      const { analysis, report } = runPortraitAnalysis(goldenCase.input);
+      const { analysis, report } = await runPortraitAnalysis(goldenCase.input);
 
       expect(analysis).toMatchObject({
         archetype: expect.any(String),

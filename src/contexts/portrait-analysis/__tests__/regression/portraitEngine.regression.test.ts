@@ -8,8 +8,8 @@ function cloneInput<T>(value: T): T {
 }
 
 describe('portrait engine regression', () => {
-  test('feature extraction remains stable for the discussion-heavy golden case', () => {
-    const { analysis } = runPortraitAnalysis(
+  test('feature extraction remains stable for the discussion-heavy golden case', async () => {
+    const { analysis } = await runPortraitAnalysis(
       getGoldenCase('discussion-heavy-single-community').input,
     );
 
@@ -30,9 +30,9 @@ describe('portrait engine regression', () => {
     });
   });
 
-  test('evidence selection remains bounded, deduped, and coverage-aware across golden cases', () => {
+  test('evidence selection remains bounded, deduped, and coverage-aware across golden cases', async () => {
     for (const goldenCase of GOLDEN_CASES) {
-      const { analysis } = runPortraitAnalysis(goldenCase.input);
+      const { analysis } = await runPortraitAnalysis(goldenCase.input);
       const evidenceIds = analysis.selectedEvidence.map((item) => item.id);
 
       expect(new Set(evidenceIds).size).toBe(evidenceIds.length);
@@ -44,21 +44,21 @@ describe('portrait engine regression', () => {
       );
     }
 
-    const crossCommunity = runPortraitAnalysis(getGoldenCase('cross-community-balanced').input).analysis;
+    const crossCommunity = (await runPortraitAnalysis(getGoldenCase('cross-community-balanced').input)).analysis;
     expect(new Set(crossCommunity.selectedEvidence.map((item) => item.community)).size).toBeGreaterThanOrEqual(2);
 
-    const lowData = runPortraitAnalysis(getGoldenCase('low-data-insufficient').input).analysis;
+    const lowData = (await runPortraitAnalysis(getGoldenCase('low-data-insufficient').input)).analysis;
     expect(lowData.selectedEvidence.length).toBeLessThanOrEqual(3);
   });
 
-  test('confidence ordering stays stable for low-data, strong-basis, and degraded cases', () => {
-    const lowData = runPortraitAnalysis(getGoldenCase('low-data-insufficient').input).analysis;
-    const strongBasis = runPortraitAnalysis(
+  test('confidence ordering stays stable for low-data, strong-basis, and degraded cases', async () => {
+    const lowData = (await runPortraitAnalysis(getGoldenCase('low-data-insufficient').input)).analysis;
+    const strongBasis = (await runPortraitAnalysis(
       getGoldenCase('topic-led-output-heavy-single-community').input,
-    ).analysis;
-    const degraded = runPortraitAnalysis(
+    )).analysis;
+    const degraded = (await runPortraitAnalysis(
       getGoldenCase('degraded-source-partial-result').input,
-    ).analysis;
+    )).analysis;
     const cleanDegradedLike: AnalyzePortraitInput = cloneInput(
       getGoldenCase('degraded-source-partial-result').input,
     );
@@ -72,16 +72,16 @@ describe('portrait engine regression', () => {
       warnings: [],
     }));
 
-    const cleanVariant = runPortraitAnalysis(cleanDegradedLike).analysis;
+    const cleanVariant = (await runPortraitAnalysis(cleanDegradedLike)).analysis;
 
     expect(lowData.confidenceProfile.overall).toBeLessThan(strongBasis.confidenceProfile.overall);
     expect(degraded.confidenceProfile.overall).toBeLessThan(cleanVariant.confidenceProfile.overall);
     expect(degraded.confidenceProfile.flags).toContain('DEGRADED_SOURCE');
   });
 
-  test('signals, tags, and archetypes remain inside expected boundaries for golden cases', () => {
+  test('signals, tags, and archetypes remain inside expected boundaries for golden cases', async () => {
     for (const goldenCase of GOLDEN_CASES) {
-      const { analysis } = runPortraitAnalysis(goldenCase.input);
+      const { analysis } = await runPortraitAnalysis(goldenCase.input);
       const signalCodes = analysis.signals.map((signal) => signal.code);
       const tagCodes = analysis.tags.map((tag) => tag.code);
 
@@ -100,7 +100,7 @@ describe('portrait engine regression', () => {
       }
     }
 
-    const lowData = runPortraitAnalysis(getGoldenCase('low-data-insufficient').input).analysis;
+    const lowData = (await runPortraitAnalysis(getGoldenCase('low-data-insufficient').input)).analysis;
 
     expect(lowData.primaryArchetype.code).toBe('INSUFFICIENT_DATA');
     expect(lowData.tags.map((tag) => tag.code)).toContain('LOW_DATA');

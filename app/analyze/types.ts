@@ -55,6 +55,28 @@ export type AnalyzeResponse = {
     summary?: string;
     tags?: string[];
   };
+  narrative?: {
+    generatedBy?: 'RULE_ONLY' | 'LLM_ASSISTED' | 'NONE';
+    fallbackUsed?: boolean;
+    mode?: 'OFF' | 'RULE_ONLY' | 'LLM_ASSISTED';
+    tone?: 'NEUTRAL' | 'ANALYTICAL' | 'CONCISE';
+    audience?: 'PRODUCT_USER' | 'INTERNAL_QA';
+    headline?: string;
+    shortSummary?: string;
+    deepSummary?: string;
+    stableTraitsSummary?: string;
+    communitySpecificSummary?: string;
+    overlapDivergenceSummary?: string;
+    caveats?: string;
+    sections?: Array<{
+      code?: string;
+      content?: string;
+      grounded?: boolean;
+      sourceHints?: string[];
+      supportingEvidenceIds?: string[];
+    }>;
+    warnings?: string[];
+  };
   warnings?: ReportWarning[];
   cluster?: {
     stableTraits?: Array<{

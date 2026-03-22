@@ -3,9 +3,9 @@ import { GOLDEN_CASES, getGoldenCase } from '@/src/contexts/portrait-analysis/__
 import { runPortraitAnalysis } from '@/src/contexts/portrait-analysis/__tests__/regression/helpers';
 
 describe('portrait report regression', () => {
-  test('top-level PortraitReport structure remains compatible across golden cases', () => {
+  test('top-level PortraitReport structure remains compatible across golden cases', async () => {
     for (const goldenCase of GOLDEN_CASES) {
-      const { report } = runPortraitAnalysis(goldenCase.input);
+      const { report } = await runPortraitAnalysis(goldenCase.input);
 
       expect(report).toMatchObject({
         portrait: {
@@ -37,8 +37,8 @@ describe('portrait report regression', () => {
     }
   });
 
-  test('report metrics stay aligned with FeatureVector, not ad-hoc recounting', () => {
-    const { analysis, report } = runPortraitAnalysis(
+  test('report metrics stay aligned with FeatureVector, not ad-hoc recounting', async () => {
+    const { analysis, report } = await runPortraitAnalysis(
       getGoldenCase('topic-led-output-heavy-single-community').input,
     );
 
@@ -51,8 +51,8 @@ describe('portrait report regression', () => {
     });
   });
 
-  test('report evidence stays sourced from selectedEvidence and does not duplicate items', () => {
-    const { analysis, report } = runPortraitAnalysis(
+  test('report evidence stays sourced from selectedEvidence and does not duplicate items', async () => {
+    const { analysis, report } = await runPortraitAnalysis(
       getGoldenCase('long-form-substantive').input,
     );
 
@@ -73,9 +73,9 @@ describe('portrait report regression', () => {
     );
   });
 
-  test('report output remains cautious for low-data and degraded cases', () => {
-    const lowData = runPortraitAnalysis(getGoldenCase('low-data-insufficient').input).report;
-    const degraded = runPortraitAnalysis(getGoldenCase('degraded-source-partial-result').input).report;
+  test('report output remains cautious for low-data and degraded cases', async () => {
+    const lowData = (await runPortraitAnalysis(getGoldenCase('low-data-insufficient').input)).report;
+    const degraded = (await runPortraitAnalysis(getGoldenCase('degraded-source-partial-result').input)).report;
 
     expect(lowData.portrait.archetype).toBe('insufficient-data');
     expect(lowData.portrait.tags).toContain('low-data');
@@ -91,11 +91,11 @@ describe('portrait report regression', () => {
     );
   });
 
-  test('community breakdowns remain minimal for single-community and differentiated for cross-community cases', () => {
-    const single = runPortraitAnalysis(
+  test('community breakdowns remain minimal for single-community and differentiated for cross-community cases', async () => {
+    const single = (await runPortraitAnalysis(
       getGoldenCase('discussion-heavy-single-community').input,
-    ).report;
-    const cross = runPortraitAnalysis(getGoldenCase('cross-community-balanced').input).report;
+    )).report;
+    const cross = (await runPortraitAnalysis(getGoldenCase('cross-community-balanced').input)).report;
 
     expect(single.communityBreakdowns).toHaveLength(1);
     expect(single.communityBreakdowns[0]).toMatchObject({
@@ -123,11 +123,11 @@ describe('portrait report regression', () => {
     );
   });
 
-  test('cluster insights stay minimal for single-community and richer for cross-community cases', () => {
-    const single = runPortraitAnalysis(
+  test('cluster insights stay minimal for single-community and richer for cross-community cases', async () => {
+    const single = (await runPortraitAnalysis(
       getGoldenCase('discussion-heavy-single-community').input,
-    ).report;
-    const cross = runPortraitAnalysis(getGoldenCase('cross-community-balanced').input).report;
+    )).report;
+    const cross = (await runPortraitAnalysis(getGoldenCase('cross-community-balanced').input)).report;
 
     expect(single.cluster?.stableTraits.length ?? 0).toBeGreaterThan(0);
     expect(single.cluster?.overlap ?? []).toEqual([]);

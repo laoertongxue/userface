@@ -1,41 +1,29 @@
 import type { ComposePortraitReportInput } from '@/src/contexts/report-composition/application/dto/ComposePortraitReportInput';
+import type { NarrativeGenerationResult } from '@/src/contexts/report-composition/application/dto/NarrativeGenerationResult';
 import type {
   ClusterInsights,
   CommunityBreakdown,
   Portrait,
   PortraitEvidence,
+  PortraitNarrative,
   PortraitMetrics,
   PortraitReport,
   PortraitWarning,
 } from '@/src/contexts/portrait-analysis/domain/aggregates/PortraitReport';
 import type { EvidenceCandidate } from '@/src/contexts/portrait-analysis/domain/entities/EvidenceCandidate';
 import type { PortraitTag } from '@/src/contexts/portrait-analysis/domain/entities/PortraitTag';
-import type { ArchetypeCode } from '@/src/contexts/portrait-analysis/domain/value-objects/ArchetypeCode';
 import { analysisConfig } from '@/src/config/analysis';
 import { ClusterReportBuilder } from '@/src/contexts/report-composition/domain/services/ClusterReportBuilder';
+import { NarrativeReportMapper } from '@/src/contexts/report-composition/domain/services/NarrativeReportMapper';
+import {
+  buildRuleSummary,
+  resolvePortraitTags,
+  toDisplayArchetype,
+} from '@/src/contexts/report-composition/domain/services/NarrativeReportPolicy';
 import { normalizeWhitespace, truncateText } from '@/src/shared/utils/text';
 
 function fallbackDisplayCode(code: string): string {
   return code.toLowerCase().replaceAll('_', '-');
-}
-
-function toDisplayArchetype(code: ArchetypeCode): string {
-  switch (code) {
-    case 'COMMUNITY_PARTICIPANT':
-      return 'community-participant';
-    case 'DISCUSSION_ORIENTED':
-      return 'discussion-oriented';
-    case 'INFORMATION_CURATOR':
-      return 'information-curator';
-    case 'INSUFFICIENT_DATA':
-      return 'insufficient-data';
-    case 'OBSERVER':
-      return 'observer';
-    case 'PROBLEM_SOLVER':
-      return 'problem-solver';
-    case 'TOPIC_ORIENTED':
-      return 'topic-oriented';
-  }
 }
 
 function dedupeWarnings(warnings: PortraitWarning[]): PortraitWarning[] {
@@ -111,80 +99,15 @@ function mapMetrics(input: ComposePortraitReportInput): PortraitMetrics {
   };
 }
 
-function buildSummary(input: ComposePortraitReportInput): string {
-  const { primaryArchetype, tags, featureVector, confidenceProfile } = input;
-  const leadingTags = tags
-    .filter((tag) => tag.code !== 'LOW_DATA')
-    .slice(0, 2)
-    .map((tag) => tag.displayName);
-
-  let base: string;
-
-  switch (primaryArchetype.code) {
-    case 'INSUFFICIENT_DATA':
-      base = '当前样本有限，画像结论仅反映已抓取到的公开活动。';
-      break;
-    case 'DISCUSSION_ORIENTED':
-      base = '更偏讨论参与型，活跃方式以回复互动为主。';
-      break;
-    case 'TOPIC_ORIENTED':
-      base = '更偏主题输出型，公开活动中主题创建占比较高。';
-      break;
-    case 'COMMUNITY_PARTICIPANT':
-      base = '表现为较稳定的社区参与型，在公开活动中持续互动。';
-      break;
-    case 'OBSERVER':
-      base = '当前更接近轻量参与型，公开活动存在但输出强度有限。';
-      break;
-    case 'PROBLEM_SOLVER':
-      base = '更偏问题解决型，公开活动以回应与解释为主。';
-      break;
-    case 'INFORMATION_CURATOR':
-      base = '更偏信息整理型，公开活动中更常见主题输出与内容组织。';
-      break;
-  }
-
-  const tagHint =
-    leadingTags.length > 0
-      ? ` 当前更显著的特征包括 ${leadingTags.join('、')}。`
-      : '';
-  const stableTraitHint =
-    input.synthesisResult.stableTraits.length > 0 && featureVector.activity.activeCommunityCount > 1
-      ? ` 跨社区稳定特征包括 ${input.synthesisResult.stableTraits
-          .slice(0, 2)
-          .map((code) => fallbackDisplayCode(code))
-          .join('、')}。`
-      : '';
-  const cautionHint =
-    input.tags.some((tag) => tag.code === 'LOW_DATA') ||
-    featureVector.dataQuality.degraded ||
-    confidenceProfile.overall < 0.5
-      ? ' 当前结论应谨慎解读。'
-      : '';
-
-  return `${base}${tagHint}${stableTraitHint}${cautionHint}`.trim();
-}
-
-function buildPortrait(input: ComposePortraitReportInput): Portrait {
-  const tags: PortraitTag[] =
-    input.tags.length > 0
-      ? input.tags
-      : [
-          {
-            code: 'LOW_DATA',
-            displayName: 'low-data',
-            summaryHint: 'The current portrait is based on a limited sample.',
-            supportingSignalCodes: ['LOW_DATA'],
-          },
-        ];
-
+function buildPortrait(
+  input: ComposePortraitReportInput,
+  tags: PortraitTag[],
+  summary: string,
+): Portrait {
   return {
     archetype: toDisplayArchetype(input.primaryArchetype.code),
     tags: tags.map((tag) => tag.displayName),
-    summary: buildSummary({
-      ...input,
-      tags,
-    }),
+    summary,
     confidence: input.confidenceProfile.overall,
   };
 }
@@ -250,15 +173,38 @@ function buildCommunityBreakdowns(
 export class ReportBuilder {
   constructor(
     private readonly clusterReportBuilder: ClusterReportBuilder = new ClusterReportBuilder(),
+    private readonly narrativeReportMapper: NarrativeReportMapper = new NarrativeReportMapper(),
   ) {}
 
-  build(input: ComposePortraitReportInput): PortraitReport {
+  buildClusterInsights(input: ComposePortraitReportInput): ClusterInsights {
+    return this.clusterReportBuilder.build(input);
+  }
+
+  buildRuleSummary(input: ComposePortraitReportInput): string {
+    return buildRuleSummary(input, resolvePortraitTags(input.tags));
+  }
+
+  build(
+    input: ComposePortraitReportInput,
+    options: {
+      cluster?: ClusterInsights;
+      narrativeResult?: NarrativeGenerationResult;
+    } = {},
+  ): PortraitReport {
     const warnings = dedupeWarnings(input.warnings);
-    const portrait = buildPortrait(input);
+    const resolvedTags = resolvePortraitTags(input.tags);
+    const cluster = options.cluster ?? this.clusterReportBuilder.build(input);
+    const narrativeMapping = this.narrativeReportMapper.map({
+      input,
+      defaultSummary: buildRuleSummary(input, resolvedTags),
+      narrativeOptions: input.narrative,
+      narrativeResult: options.narrativeResult,
+    });
+    const portrait = buildPortrait(input, resolvedTags, narrativeMapping.summary);
     const evidence = mapEvidence(input.selectedEvidence);
     const metrics = mapMetrics(input);
-    const communityBreakdowns = buildCommunityBreakdowns(input, input.tags);
-    const cluster: ClusterInsights = this.clusterReportBuilder.build(input);
+    const communityBreakdowns = buildCommunityBreakdowns(input, resolvedTags);
+    const narrative: PortraitNarrative | undefined = narrativeMapping.narrative;
 
     return {
       portrait,
@@ -267,6 +213,7 @@ export class ReportBuilder {
       communityBreakdowns,
       warnings,
       cluster,
+      narrative,
     };
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import React from 'react';
 import { pairKeyForAccounts } from '@/app/analyze/_lib/clusterDraft';
 import type {
   AnalyzeError,
@@ -8,19 +8,17 @@ import type {
   SuggestionDecisionStatus,
   SuggestionResponse,
 } from '@/app/analyze/types';
-
-const cardStyle: CSSProperties = {
-  padding: 20,
-  border: '1px solid #d1d5db',
-  borderRadius: 12,
-  background: '#ffffff',
-};
-
-const sectionTitleStyle: CSSProperties = {
-  marginTop: 0,
-  marginBottom: 12,
-  fontSize: 20,
-};
+import {
+  buttonStyle,
+  errorPanelStyle,
+  insetPanelStyle,
+  itemCardStyle,
+  mutedTextStyle,
+  panelStyle,
+  pillBaseStyle,
+  sectionTitleStyle,
+  subSectionTitleStyle,
+} from '@/app/analyze/_components/resultUi';
 
 function formatConfidence(value: number | undefined): string {
   if (value === undefined || Number.isNaN(value)) {
@@ -36,6 +34,28 @@ function currentDecisionStatus(
   fallback: SuggestionDecisionStatus = 'PENDING',
 ): SuggestionDecisionStatus {
   return decisions.find((decision) => decision.pairKey === pairKey)?.status ?? fallback;
+}
+
+function suggestionStatusPill(status: SuggestionDecisionStatus) {
+  if (status === 'ACCEPTED') {
+    return {
+      ...pillBaseStyle,
+      borderColor: 'var(--border-accent-soft)',
+      background: 'rgba(255,154,60,0.16)',
+      color: 'var(--accent)',
+    };
+  }
+
+  if (status === 'REJECTED') {
+    return {
+      ...pillBaseStyle,
+      borderColor: 'rgba(255,107,74,0.28)',
+      background: 'rgba(255,107,74,0.12)',
+      color: '#ffd7cc',
+    };
+  }
+
+  return pillBaseStyle;
 }
 
 type SuggestionPanelProps = {
@@ -62,73 +82,57 @@ export function SuggestionPanel({
   const warnings = result?.warnings ?? [];
 
   return (
-    <section style={cardStyle}>
+    <section style={panelStyle}>
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          gap: 12,
-          alignItems: 'center',
+          gap: 18,
+          alignItems: 'flex-start',
           flexWrap: 'wrap',
         }}
       >
-        <div>
-          <h2 style={sectionTitleStyle}>关联建议</h2>
-          <p style={{ marginTop: 0, marginBottom: 0, color: '#4b5563', lineHeight: 1.6 }}>
-            这里调用 <code>/api/identity/suggest</code> 获取账号对建议。接受或拒绝只会更新当前浏览器里的草稿状态，不会自动写入后端事实。
+        <div style={{ maxWidth: 620 }}>
+          <p style={subSectionTitleStyle}>Suggestion Review</p>
+          <h2 style={sectionTitleStyle}>关联建议审阅</h2>
+          <p style={mutedTextStyle}>
+            这里调用 <code>/api/identity/suggest</code> 获取账号对建议。接受或拒绝只会更新当前浏览器中的草稿状态，不会自动合并账号，也不会写入后端事实。
           </p>
         </div>
         <button
           type="button"
           disabled={requestDisabled || loading}
           onClick={onRequest}
-          style={{
-            padding: '10px 16px',
-            border: 0,
-            borderRadius: 8,
-            background: requestDisabled || loading ? '#9ca3af' : '#111827',
-            color: '#ffffff',
-            cursor: requestDisabled || loading ? 'not-allowed' : 'pointer',
-            minWidth: 120,
-          }}
+          style={buttonStyle('primary', requestDisabled || loading)}
         >
           {loading ? '建议中...' : '获取关联建议'}
         </button>
       </div>
 
       {error && (
-        <div
-          style={{
-            marginTop: 16,
-            padding: 12,
-            borderRadius: 10,
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-          }}
-        >
-          <strong>{error.code}</strong>: {error.message}
+        <div style={{ ...errorPanelStyle, marginTop: 18 }}>
+          <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Suggestion Error</p>
+          <p style={{ margin: 0, lineHeight: 1.7 }}>
+            <strong>{error.code}</strong>: {error.message}
+          </p>
         </div>
       )}
 
       {!result && !loading && !error && (
-        <p style={{ marginTop: 16, marginBottom: 0, lineHeight: 1.6 }}>
-          当前还没有 suggestion 结果。聚合模式下至少准备 2 个非空账号后，再请求关联建议。
-        </p>
+        <div style={{ ...insetPanelStyle, marginTop: 18 }}>
+          <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Empty State</p>
+          <p style={mutedTextStyle}>
+            当前还没有 suggestion 结果。聚合模式下至少准备 2 个去重后的非空账号后，再请求关联建议。
+          </p>
+        </div>
       )}
 
       {result && (
-        <div style={{ display: 'grid', gap: 16, marginTop: 16 }}>
+        <div style={{ display: 'grid', gap: 18, marginTop: 18 }}>
           {warnings.length > 0 && (
-            <div
-              style={{
-                padding: 12,
-                borderRadius: 10,
-                background: '#fffbeb',
-                border: '1px solid #fcd34d',
-              }}
-            >
-              <strong>Suggestion Warnings</strong>
-              <ul style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20, lineHeight: 1.7 }}>
+            <div style={insetPanelStyle}>
+              <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Suggestion Warnings</p>
+              <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
                 {warnings.map((warning, index) => (
                   <li key={`${warning.code ?? 'warning'}-${index}`}>
                     <strong>{warning.code ?? 'UNKNOWN_WARNING'}</strong>: {warning.message ?? 'No message'}
@@ -139,9 +143,13 @@ export function SuggestionPanel({
           )}
 
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Suggestions</h3>
+            <p style={subSectionTitleStyle}>Suggestions</p>
             {suggestions.length === 0 ? (
-              <p style={{ margin: 0 }}>当前没有达到阈值的关联建议。</p>
+              <div style={insetPanelStyle}>
+                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                  当前没有达到阈值的关联建议。
+                </p>
+              </div>
             ) : (
               <div style={{ display: 'grid', gap: 12 }}>
                 {suggestions.map((suggestion, index) => {
@@ -152,78 +160,89 @@ export function SuggestionPanel({
                       handle: account.handle ?? '',
                     })),
                   );
-                  const status = currentDecisionStatus(decisionKey, decisionState, suggestion.status ?? 'PENDING');
+                  const status = currentDecisionStatus(
+                    decisionKey,
+                    decisionState,
+                    suggestion.status ?? 'PENDING',
+                  );
 
                   return (
                     <article
                       key={`${decisionKey}-${index}`}
-                      style={{
-                        padding: 16,
-                        borderRadius: 10,
-                        background: '#f9fafb',
-                        border: '1px solid #e5e7eb',
-                      }}
+                      style={itemCardStyle(status === 'ACCEPTED' ? 'accent' : 'default')}
                     >
-                      <p style={{ marginTop: 0 }}>
-                        <strong>Accounts:</strong>{' '}
-                        {accounts.length > 0
-                          ? accounts
-                              .map((account) => `${account.community ?? 'unknown'}:${account.handle ?? 'N/A'}`)
-                              .join(' ↔ ')
-                          : 'N/A'}
-                      </p>
-                      <p>
-                        <strong>Confidence:</strong> {formatConfidence(suggestion.confidence)}
-                      </p>
-                      <p>
-                        <strong>Reasons:</strong>{' '}
-                        {suggestion.reasons?.length ? suggestion.reasons.join(', ') : 'N/A'}
-                      </p>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                          marginBottom: 12,
+                        }}
+                      >
+                        <div>
+                          <div style={subSectionTitleStyle}>Candidate Pair</div>
+                          <strong style={{ fontSize: 16 }}>
+                            {accounts.length > 0
+                              ? accounts
+                                  .map(
+                                    (account) =>
+                                      `${account.community ?? 'unknown'}:${account.handle ?? 'N/A'}`,
+                                  )
+                                  .join(' ↔ ')
+                              : 'N/A'}
+                          </strong>
+                        </div>
+                        <span style={suggestionStatusPill(status)}>{status}</span>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'grid',
+                          gap: 12,
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                          marginBottom: 12,
+                        }}
+                      >
+                        <div style={insetPanelStyle}>
+                          <div style={subSectionTitleStyle}>Confidence</div>
+                          <strong style={{ fontSize: 22 }}>{formatConfidence(suggestion.confidence)}</strong>
+                        </div>
+                        <div style={insetPanelStyle}>
+                          <div style={subSectionTitleStyle}>Reasons</div>
+                          <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                            {suggestion.reasons?.length ? suggestion.reasons.join(', ') : 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+
                       {suggestion.sourceHint && (
-                        <p style={{ lineHeight: 1.6 }}>
-                          <strong>Hint:</strong> {suggestion.sourceHint}
+                        <p style={{ ...mutedTextStyle, marginBottom: 12 }}>
+                          <strong style={{ color: 'var(--text-primary)' }}>Hint:</strong>{' '}
+                          {suggestion.sourceHint}
                         </p>
                       )}
-                      <p>
-                        <strong>Status:</strong> {status}
-                      </p>
+
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button
                           type="button"
                           onClick={() => onUpdateDecision(decisionKey, 'ACCEPTED')}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: 8,
-                            border: '1px solid #16a34a',
-                            background: status === 'ACCEPTED' ? '#dcfce7' : '#ffffff',
-                            cursor: 'pointer',
-                          }}
+                          style={buttonStyle('primary', false)}
                         >
                           接受建议
                         </button>
                         <button
                           type="button"
                           onClick={() => onUpdateDecision(decisionKey, 'REJECTED')}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: 8,
-                            border: '1px solid #dc2626',
-                            background: status === 'REJECTED' ? '#fee2e2' : '#ffffff',
-                            cursor: 'pointer',
-                          }}
+                          style={buttonStyle('danger', false)}
                         >
                           拒绝建议
                         </button>
                         <button
                           type="button"
                           onClick={() => onUpdateDecision(decisionKey, 'PENDING')}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: 8,
-                            border: '1px solid #9ca3af',
-                            background: status === 'PENDING' ? '#f3f4f6' : '#ffffff',
-                            cursor: 'pointer',
-                          }}
+                          style={buttonStyle('secondary', false)}
                         >
                           恢复待定
                         </button>
@@ -236,14 +255,15 @@ export function SuggestionPanel({
           </div>
 
           {(ignoredPairs.length > 0 || (result.inspectedAccounts?.length ?? 0) > 0) && (
-            <details>
-              <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+            <details style={{ ...insetPanelStyle, paddingBottom: 16 }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 700 }}>
                 查看 inspected accounts / ignored pairs
               </summary>
+
               {(result.inspectedAccounts?.length ?? 0) > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <strong>Inspected Accounts</strong>
-                  <ul style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20 }}>
+                <div style={{ marginTop: 14 }}>
+                  <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Inspected Accounts</p>
+                  <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
                     {(result.inspectedAccounts ?? []).map((account, index) => (
                       <li key={`${account.community ?? 'unknown'}-${account.handle ?? index}`}>
                         {account.community ?? 'unknown'}:{account.handle ?? 'N/A'}
@@ -252,12 +272,15 @@ export function SuggestionPanel({
                   </ul>
                 </div>
               )}
+
               {ignoredPairs.length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <strong>Ignored Pairs</strong>
-                  <ul style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20, lineHeight: 1.7 }}>
+                <div style={{ marginTop: 14 }}>
+                  <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Ignored Pairs</p>
+                  <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
                     {ignoredPairs.map((pair, index) => (
-                      <li key={`${pair.from?.community ?? 'unknown'}-${pair.to?.community ?? 'unknown'}-${index}`}>
+                      <li
+                        key={`${pair.from?.community ?? 'unknown'}-${pair.to?.community ?? 'unknown'}-${index}`}
+                      >
                         {(pair.from?.community ?? 'unknown')}:{pair.from?.handle ?? 'N/A'} ↔{' '}
                         {(pair.to?.community ?? 'unknown')}:{pair.to?.handle ?? 'N/A'}{' '}
                         ({pair.reason ?? 'unknown'})

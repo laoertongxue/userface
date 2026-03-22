@@ -10,6 +10,17 @@ import type { PortraitTag } from '@/src/contexts/portrait-analysis/domain/entiti
 import type { Signal } from '@/src/contexts/portrait-analysis/domain/entities/Signal';
 import type { ArchetypeCode } from '@/src/contexts/portrait-analysis/domain/value-objects/ArchetypeCode';
 import type { FetchIdentityClusterSnapshotsResult } from '@/src/contexts/source-acquisition/application/use-cases/FetchIdentityClusterSnapshots';
+import type { NarrativeFallbackPolicy } from '@/src/contexts/report-composition/application/dto/NarrativeFallbackPolicy';
+import type { NarrativeAudience } from '@/src/contexts/report-composition/domain/value-objects/NarrativeAudience';
+import type { NarrativeMode } from '@/src/contexts/report-composition/domain/value-objects/NarrativeMode';
+import type { NarrativeTone } from '@/src/contexts/report-composition/domain/value-objects/NarrativeTone';
+
+export type ComposePortraitReportNarrativeOptions = {
+  mode: NarrativeMode;
+  tone: NarrativeTone;
+  audience: NarrativeAudience;
+  fallbackPolicy: NarrativeFallbackPolicy;
+};
 
 export type ComposePortraitReportInput = {
   archetype: ArchetypeCode;
@@ -25,4 +36,5 @@ export type ComposePortraitReportInput = {
   warnings: PortraitWarning[];
   clusterMergeResult?: ClusterMergeResult;
   fetchResult?: FetchIdentityClusterSnapshotsResult;
+  narrative?: Partial<ComposePortraitReportNarrativeOptions>;
 };

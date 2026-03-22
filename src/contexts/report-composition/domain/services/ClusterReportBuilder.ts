@@ -246,25 +246,29 @@ function buildDivergence(
 
 function buildAccountCoverage(input: ComposePortraitReportInput): AccountCoverage {
   const requestedAccounts = dedupeAccounts(input.identityCluster.accounts);
+  const successfulFromFetch =
+    input.fetchResult?.successfulSnapshots.map((entry) => entry.account) ?? [];
+  const successfulFromMerge =
+    input.clusterMergeResult?.perAccountWarnings
+      .filter((entry) => entry.successful)
+      .map((entry) => entry.account) ?? [];
   const successfulAccounts = dedupeAccounts(
-    input.fetchResult?.successfulSnapshots.map((entry) => entry.account) ??
-      input.clusterMergeResult?.perAccountWarnings
-        .filter((entry) => entry.successful)
-        .map((entry) => entry.account) ??
-      [],
+    successfulFromFetch.length > 0 ? successfulFromFetch : successfulFromMerge,
   );
-  const failedAccounts = (
+  const failedFromFetch =
     input.fetchResult?.failedAccounts.map((entry) => ({
       account: toReportAccountRef(entry.account),
       reason: entry.message,
-    })) ??
+    })) ?? [];
+  const failedFromMerge =
     input.clusterMergeResult?.perAccountWarnings
       .filter((entry) => !entry.successful)
       .map((entry) => ({
         account: toReportAccountRef(entry.account),
         reason: entry.warnings[0]?.message,
-      })) ??
-    []
+      })) ?? [];
+  const failedAccounts = (
+    failedFromFetch.length > 0 ? failedFromFetch : failedFromMerge
   ).filter(
     (failure, index, all) =>
       all.findIndex((candidate) => accountKey(candidate.account) === accountKey(failure.account)) ===

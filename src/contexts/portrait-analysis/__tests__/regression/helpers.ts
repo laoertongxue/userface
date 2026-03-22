@@ -2,9 +2,9 @@ import type { AnalyzePortraitInput } from '@/src/contexts/portrait-analysis/appl
 import { AnalyzeIdentityCluster } from '@/src/contexts/portrait-analysis/application/use-cases/AnalyzeIdentityCluster';
 import { ComposePortraitReport } from '@/src/contexts/report-composition/application/use-cases/ComposePortraitReport';
 
-export function runPortraitAnalysis(input: AnalyzePortraitInput) {
+export async function runPortraitAnalysis(input: AnalyzePortraitInput) {
   const analysis = new AnalyzeIdentityCluster().execute(input);
-  const report = new ComposePortraitReport().execute(analysis);
+  const report = await new ComposePortraitReport().execute(analysis);
 
   return {
     analysis,

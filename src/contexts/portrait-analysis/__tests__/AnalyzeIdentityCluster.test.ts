@@ -154,9 +154,9 @@ const compatibilityInput: AnalyzePortraitInput = {
 };
 
 describe('AnalyzeIdentityCluster', () => {
-  test('still supports the existing PortraitReport envelope after composition', () => {
+  test('still supports the existing PortraitReport envelope after composition', async () => {
     const analysis = new AnalyzeIdentityCluster().execute(compatibilityInput);
-    const report = new ComposePortraitReport().execute(analysis);
+    const report = await new ComposePortraitReport().execute(analysis);
 
     expect(report).toMatchObject({
       portrait: {

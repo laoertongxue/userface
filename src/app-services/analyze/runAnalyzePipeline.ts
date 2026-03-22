@@ -5,6 +5,7 @@ import { FetchIdentityClusterSnapshots } from '@/src/contexts/source-acquisition
 import { AnalyzeIdentityCluster } from '@/src/contexts/portrait-analysis/application/use-cases/AnalyzeIdentityCluster';
 import { ComposePortraitReport } from '@/src/contexts/report-composition/application/use-cases/ComposePortraitReport';
 import { platformPolicies } from '@/src/contexts/platform-governance/infrastructure/config/policies';
+import { analysisConfig } from '@/src/config/analysis';
 
 export async function runAnalyzePipeline(input: AnalyzeRequest) {
   const identityCluster = new ResolveIdentityCluster().execute(input.identity);
@@ -31,5 +32,12 @@ export async function runAnalyzePipeline(input: AnalyzeRequest) {
     fetchResult,
   });
 
-  return new ComposePortraitReport().execute(analysis);
+  const llmProvider = input.options?.llmProvider ?? analysisConfig.defaults.llmProvider;
+
+  return new ComposePortraitReport().execute({
+    ...analysis,
+    narrative: {
+      mode: llmProvider === 'minimax' ? 'LLM_ASSISTED' : 'OFF',
+    },
+  });
 }

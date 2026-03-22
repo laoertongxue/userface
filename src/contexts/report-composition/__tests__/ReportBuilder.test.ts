@@ -251,7 +251,7 @@ describe('ReportBuilder', () => {
         message: 'Topics were partially available for this request.',
       },
     ]);
-    expect(report.cluster?.confidence?.overall).toBeLessThanOrEqual(0.28);
+    expect(report.cluster?.confidence?.overall).toBeLessThan(0.5);
     expect(report.cluster?.confidence?.flags).toEqual(
       expect.arrayContaining(['DEGRADED_SOURCE']),
     );

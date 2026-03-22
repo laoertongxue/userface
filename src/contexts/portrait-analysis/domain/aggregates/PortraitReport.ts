@@ -1,3 +1,9 @@
+import type { NarrativeGeneratedBy } from '@/src/contexts/report-composition/domain/entities/NarrativeDraft';
+import type { NarrativeSection } from '@/src/contexts/report-composition/domain/entities/NarrativeSection';
+import type { NarrativeAudience } from '@/src/contexts/report-composition/domain/value-objects/NarrativeAudience';
+import type { NarrativeMode } from '@/src/contexts/report-composition/domain/value-objects/NarrativeMode';
+import type { NarrativeTone } from '@/src/contexts/report-composition/domain/value-objects/NarrativeTone';
+
 export type PortraitEvidence = {
   label: string;
   excerpt: string;
@@ -103,6 +109,23 @@ export type ClusterInsights = {
   accountCoverage: AccountCoverage;
 };
 
+export type PortraitNarrative = {
+  generatedBy: NarrativeGeneratedBy;
+  fallbackUsed: boolean;
+  mode: NarrativeMode;
+  tone: NarrativeTone;
+  audience: NarrativeAudience;
+  headline?: string;
+  shortSummary?: string;
+  deepSummary?: string;
+  stableTraitsSummary?: string;
+  communitySpecificSummary?: string;
+  overlapDivergenceSummary?: string;
+  caveats?: string;
+  sections?: NarrativeSection[];
+  warnings?: string[];
+};
+
 export type PortraitReport = {
   portrait: Portrait;
   evidence: PortraitEvidence[];
@@ -110,4 +133,5 @@ export type PortraitReport = {
   communityBreakdowns: CommunityBreakdown[];
   warnings: PortraitWarning[];
   cluster?: ClusterInsights;
+  narrative?: PortraitNarrative;
 };
