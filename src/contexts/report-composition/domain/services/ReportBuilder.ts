@@ -1,5 +1,6 @@
 import type { ComposePortraitReportInput } from '@/src/contexts/report-composition/application/dto/ComposePortraitReportInput';
 import type {
+  ClusterInsights,
   CommunityBreakdown,
   Portrait,
   PortraitEvidence,
@@ -11,6 +12,7 @@ import type { EvidenceCandidate } from '@/src/contexts/portrait-analysis/domain/
 import type { PortraitTag } from '@/src/contexts/portrait-analysis/domain/entities/PortraitTag';
 import type { ArchetypeCode } from '@/src/contexts/portrait-analysis/domain/value-objects/ArchetypeCode';
 import { analysisConfig } from '@/src/config/analysis';
+import { ClusterReportBuilder } from '@/src/contexts/report-composition/domain/services/ClusterReportBuilder';
 import { normalizeWhitespace, truncateText } from '@/src/shared/utils/text';
 
 function fallbackDisplayCode(code: string): string {
@@ -246,12 +248,17 @@ function buildCommunityBreakdowns(
 }
 
 export class ReportBuilder {
+  constructor(
+    private readonly clusterReportBuilder: ClusterReportBuilder = new ClusterReportBuilder(),
+  ) {}
+
   build(input: ComposePortraitReportInput): PortraitReport {
     const warnings = dedupeWarnings(input.warnings);
     const portrait = buildPortrait(input);
     const evidence = mapEvidence(input.selectedEvidence);
     const metrics = mapMetrics(input);
     const communityBreakdowns = buildCommunityBreakdowns(input, input.tags);
+    const cluster: ClusterInsights = this.clusterReportBuilder.build(input);
 
     return {
       portrait,
@@ -259,6 +266,7 @@ export class ReportBuilder {
       metrics,
       communityBreakdowns,
       warnings,
+      cluster,
     };
   }
 }

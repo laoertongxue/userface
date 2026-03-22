@@ -1,6 +1,8 @@
-import type { ExternalAccountRef } from '@/src/contexts/source-acquisition/domain/contracts/AcquisitionPorts';
+import type { ClusterAccountRef } from '@/src/contexts/identity-resolution/domain/entities/ClusterAccountRef';
+import type { ClusterAnalysisMode } from '@/src/contexts/identity-resolution/domain/value-objects/ClusterAnalysisMode';
 
 export type ResolveIdentityInput = {
   label?: string;
-  accounts: ExternalAccountRef[];
+  accounts: ClusterAccountRef[];
+  mode?: ClusterAnalysisMode;
 };

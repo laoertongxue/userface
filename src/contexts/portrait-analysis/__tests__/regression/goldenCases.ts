@@ -1,4 +1,5 @@
 import { BuildCanonicalActivityStream } from '@/src/contexts/activity-normalization/application/use-cases/BuildCanonicalActivityStream';
+import { createIdentityCluster } from '@/src/contexts/identity-resolution/domain/aggregates/IdentityCluster';
 import type { AnalyzePortraitInput } from '@/src/contexts/portrait-analysis/application/dto/AnalyzePortraitInput';
 import type { ArchetypeCode } from '@/src/contexts/portrait-analysis/domain/value-objects/ArchetypeCode';
 import type { SignalCode } from '@/src/contexts/portrait-analysis/domain/value-objects/SignalCode';
@@ -129,10 +130,19 @@ function buildAnalyzePortraitInput(seeds: SnapshotSeed[]): AnalyzePortraitInput 
   const snapshots = seeds.map(makeSnapshot);
 
   return {
-    identityCluster: {
+    identityCluster: createIdentityCluster({
       accounts: snapshots.map((snapshot) => snapshot.ref),
-      mergeSuggestions: [],
-    },
+      links:
+        snapshots.length > 1
+          ? snapshots.slice(1).map((snapshot) => ({
+              from: snapshots[0].ref,
+              to: snapshot.ref,
+              source: 'USER_ASSERTED' as const,
+            }))
+          : [],
+      mode: snapshots.length === 1 ? 'SINGLE_ACCOUNT' : 'MANUAL_CLUSTER',
+      now: '2026-03-22T00:00:00.000Z',
+    }),
     snapshots,
     activityStream: new BuildCanonicalActivityStream().execute(snapshots),
   };

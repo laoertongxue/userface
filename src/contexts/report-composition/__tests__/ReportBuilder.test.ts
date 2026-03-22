@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { createIdentityCluster } from '@/src/contexts/identity-resolution/domain/aggregates/IdentityCluster';
 import type { ComposePortraitReportInput } from '@/src/contexts/report-composition/application/dto/ComposePortraitReportInput';
 import { ReportBuilder } from '@/src/contexts/report-composition/domain/services/ReportBuilder';
 import {
@@ -11,6 +12,40 @@ import {
 function reportInput(overrides: Partial<ComposePortraitReportInput> = {}): ComposePortraitReportInput {
   return {
     archetype: overrides.archetype ?? 'DISCUSSION_ORIENTED',
+    clusterMergeResult:
+      overrides.clusterMergeResult ?? {
+        mergedActivities: [],
+        perAccountProfiles: [
+          {
+            account: {
+              community: 'v2ex',
+              handle: 'alpha',
+            },
+            profile: {
+              community: 'v2ex',
+              handle: 'alpha',
+              displayName: 'alpha',
+              stats: {},
+            },
+          },
+        ],
+        perAccountWarnings: [
+          {
+            account: {
+              community: 'v2ex',
+              handle: 'alpha',
+            },
+            warnings: [],
+            degraded: false,
+            successful: true,
+          },
+        ],
+        clusterWarnings: [],
+        degraded: false,
+        successfulAccountCount: 1,
+        failedAccountCount: 0,
+        activeCommunities: ['v2ex'],
+      },
     confidenceProfile: overrides.confidenceProfile ?? makeConfidenceProfile(),
     evidenceCandidates:
       overrides.evidenceCandidates ??
@@ -25,6 +60,37 @@ function reportInput(overrides: Partial<ComposePortraitReportInput> = {}): Compo
         }),
       ],
     featureVector: overrides.featureVector ?? makeFeatureVector(),
+    fetchResult:
+      overrides.fetchResult ?? {
+        identityCluster: createIdentityCluster({
+          accounts: [
+            {
+              community: 'v2ex',
+              handle: 'alpha',
+            },
+          ],
+          mode: 'SINGLE_ACCOUNT',
+          now: '2026-03-22T00:00:00.000Z',
+        }),
+        successfulSnapshots: [],
+        failedAccounts: [],
+        totalAccounts: 1,
+        successfulCount: 1,
+        failedCount: 0,
+        degraded: false,
+      },
+    identityCluster:
+      overrides.identityCluster ??
+      createIdentityCluster({
+        accounts: [
+          {
+            community: 'v2ex',
+            handle: 'alpha',
+          },
+        ],
+        mode: 'SINGLE_ACCOUNT',
+        now: '2026-03-22T00:00:00.000Z',
+      }),
     primaryArchetype: overrides.primaryArchetype ?? {
       code: 'DISCUSSION_ORIENTED',
       score: 0.72,
@@ -123,6 +189,18 @@ describe('ReportBuilder', () => {
         }),
       ],
       warnings: [],
+      cluster: expect.objectContaining({
+        stableTraits: expect.any(Array),
+        communitySpecificTraits: expect.any(Object),
+        confidence: expect.objectContaining({
+          overall: expect.any(Number),
+        }),
+        accountCoverage: expect.objectContaining({
+          requestedAccounts: expect.any(Array),
+          successfulAccounts: expect.any(Array),
+          failedAccounts: expect.any(Array),
+        }),
+      }),
     });
   });
 
@@ -173,6 +251,10 @@ describe('ReportBuilder', () => {
         message: 'Topics were partially available for this request.',
       },
     ]);
+    expect(report.cluster?.confidence?.overall).toBeLessThanOrEqual(0.28);
+    expect(report.cluster?.confidence?.flags).toEqual(
+      expect.arrayContaining(['DEGRADED_SOURCE']),
+    );
   });
 
   test('maps metrics strictly from FeatureVector', () => {
@@ -244,6 +326,150 @@ describe('ReportBuilder', () => {
   test('builds distinguishable community breakdowns for multi-community input', () => {
     const report = new ReportBuilder().build(
       reportInput({
+        clusterMergeResult: {
+          mergedActivities: [],
+          perAccountProfiles: [
+            {
+              account: {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              profile: {
+                community: 'v2ex',
+                handle: 'alpha',
+                displayName: 'alpha',
+                stats: {},
+              },
+            },
+            {
+              account: {
+                community: 'guozaoke',
+                handle: 'beta',
+              },
+              profile: {
+                community: 'guozaoke',
+                handle: 'beta',
+                displayName: 'beta',
+                stats: {},
+              },
+            },
+          ],
+          perAccountWarnings: [
+            {
+              account: {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              warnings: [],
+              degraded: false,
+              successful: true,
+            },
+            {
+              account: {
+                community: 'guozaoke',
+                handle: 'beta',
+              },
+              warnings: [],
+              degraded: false,
+              successful: true,
+            },
+          ],
+          clusterWarnings: [],
+          degraded: false,
+          successfulAccountCount: 2,
+          failedAccountCount: 0,
+          activeCommunities: ['guozaoke', 'v2ex'],
+        },
+        fetchResult: {
+          identityCluster: createIdentityCluster({
+            accounts: [
+              {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              {
+                community: 'guozaoke',
+                handle: 'beta',
+              },
+            ],
+            links: [
+              {
+                from: {
+                  community: 'v2ex',
+                  handle: 'alpha',
+                },
+                to: {
+                  community: 'guozaoke',
+                  handle: 'beta',
+                },
+                source: 'USER_ASSERTED',
+              },
+            ],
+            mode: 'MANUAL_CLUSTER',
+            now: '2026-03-22T00:00:00.000Z',
+          }),
+          successfulSnapshots: [
+            {
+              account: {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              snapshot: {
+                ref: {
+                  community: 'v2ex',
+                  handle: 'alpha',
+                },
+                profile: {
+                  community: 'v2ex',
+                  handle: 'alpha',
+                  displayName: 'alpha',
+                  stats: {},
+                },
+                activities: [],
+                diagnostics: {
+                  fetchedPages: 1,
+                  fetchedItems: 0,
+                  elapsedMs: 100,
+                  degraded: false,
+                  usedRoutes: [],
+                },
+                warnings: [],
+              },
+            },
+            {
+              account: {
+                community: 'guozaoke',
+                handle: 'beta',
+              },
+              snapshot: {
+                ref: {
+                  community: 'guozaoke',
+                  handle: 'beta',
+                },
+                profile: {
+                  community: 'guozaoke',
+                  handle: 'beta',
+                  displayName: 'beta',
+                  stats: {},
+                },
+                activities: [],
+                diagnostics: {
+                  fetchedPages: 1,
+                  fetchedItems: 0,
+                  elapsedMs: 100,
+                  degraded: false,
+                  usedRoutes: [],
+                },
+                warnings: [],
+              },
+            },
+          ],
+          failedAccounts: [],
+          totalAccounts: 2,
+          successfulCount: 2,
+          failedCount: 0,
+          degraded: false,
+        },
         featureVector: makeFeatureVector({
           activity: {
             activeCommunities: ['guozaoke', 'v2ex'],
@@ -300,6 +526,33 @@ describe('ReportBuilder', () => {
             },
           ],
         },
+        identityCluster: createIdentityCluster({
+          accounts: [
+            {
+              community: 'v2ex',
+              handle: 'alpha',
+            },
+            {
+              community: 'guozaoke',
+              handle: 'beta',
+            },
+          ],
+          links: [
+            {
+              from: {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              to: {
+                community: 'guozaoke',
+                handle: 'beta',
+              },
+              source: 'USER_ASSERTED',
+            },
+          ],
+          mode: 'MANUAL_CLUSTER',
+          now: '2026-03-22T00:00:00.000Z',
+        }),
         tags: [
           {
             code: 'DISCUSSION_HEAVY',
@@ -344,6 +597,192 @@ describe('ReportBuilder', () => {
           },
         }),
       ]),
+    );
+    expect(report.cluster?.stableTraits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'DISCUSSION_HEAVY',
+        }),
+      ]),
+    );
+    expect(report.cluster?.communitySpecificTraits).toMatchObject({
+      v2ex: expect.any(Array),
+      guozaoke: expect.arrayContaining([expect.objectContaining({ code: 'TOPIC_LED' })]),
+    });
+    expect(report.cluster?.overlap).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          communities: ['guozaoke', 'v2ex'],
+        }),
+      ]),
+    );
+    expect(report.cluster?.accountCoverage).toMatchObject({
+      successfulCount: 2,
+      failedCount: 0,
+      activeCommunities: ['guozaoke', 'v2ex'],
+    });
+  });
+
+  test('tracks account coverage and lowers cluster confidence when some accounts fail', () => {
+    const report = new ReportBuilder().build(
+      reportInput({
+        clusterMergeResult: {
+          mergedActivities: [],
+          perAccountProfiles: [
+            {
+              account: {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              profile: {
+                community: 'v2ex',
+                handle: 'alpha',
+                displayName: 'alpha',
+                stats: {},
+              },
+            },
+          ],
+          perAccountWarnings: [
+            {
+              account: {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              warnings: [],
+              degraded: false,
+              successful: true,
+            },
+          ],
+          clusterWarnings: [
+            {
+              code: 'PARTIAL_RESULT',
+              message: 'One account could not be fetched for the cluster.',
+            },
+          ],
+          degraded: true,
+          successfulAccountCount: 1,
+          failedAccountCount: 1,
+          activeCommunities: ['v2ex'],
+        },
+        fetchResult: {
+          identityCluster: createIdentityCluster({
+            accounts: [
+              {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              {
+                community: 'guozaoke',
+                handle: 'beta',
+              },
+            ],
+            links: [
+              {
+                from: {
+                  community: 'v2ex',
+                  handle: 'alpha',
+                },
+                to: {
+                  community: 'guozaoke',
+                  handle: 'beta',
+                },
+                source: 'USER_ASSERTED',
+              },
+            ],
+            mode: 'MANUAL_CLUSTER',
+            now: '2026-03-22T00:00:00.000Z',
+          }),
+          successfulSnapshots: [
+            {
+              account: {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              snapshot: {
+                ref: {
+                  community: 'v2ex',
+                  handle: 'alpha',
+                },
+                profile: {
+                  community: 'v2ex',
+                  handle: 'alpha',
+                  displayName: 'alpha',
+                  stats: {},
+                },
+                activities: [],
+                diagnostics: {
+                  fetchedPages: 1,
+                  fetchedItems: 0,
+                  elapsedMs: 100,
+                  degraded: false,
+                  usedRoutes: [],
+                },
+                warnings: [],
+              },
+            },
+          ],
+          failedAccounts: [
+            {
+              account: {
+                community: 'guozaoke',
+                handle: 'beta',
+              },
+              code: 'PARTIAL_RESULT',
+              message: 'Failed to fetch guozaoke:beta for cluster analysis.',
+            },
+          ],
+          totalAccounts: 2,
+          successfulCount: 1,
+          failedCount: 1,
+          degraded: true,
+        },
+        identityCluster: createIdentityCluster({
+          accounts: [
+            {
+              community: 'v2ex',
+              handle: 'alpha',
+            },
+            {
+              community: 'guozaoke',
+              handle: 'beta',
+            },
+          ],
+          links: [
+            {
+              from: {
+                community: 'v2ex',
+                handle: 'alpha',
+              },
+              to: {
+                community: 'guozaoke',
+                handle: 'beta',
+              },
+              source: 'USER_ASSERTED',
+            },
+          ],
+          mode: 'MANUAL_CLUSTER',
+          now: '2026-03-22T00:00:00.000Z',
+        }),
+      }),
+    );
+
+    expect(report.cluster?.accountCoverage).toMatchObject({
+      requestedAccounts: [
+        expect.objectContaining({ community: 'v2ex', handle: 'alpha' }),
+        expect.objectContaining({ community: 'guozaoke', handle: 'beta' }),
+      ],
+      successfulAccounts: [expect.objectContaining({ community: 'v2ex', handle: 'alpha' })],
+      failedAccounts: [
+        expect.objectContaining({
+          account: expect.objectContaining({ community: 'guozaoke', handle: 'beta' }),
+        }),
+      ],
+      successfulCount: 1,
+      failedCount: 1,
+    });
+    expect(report.cluster?.confidence?.overall).toBeLessThan(0.72);
+    expect(report.cluster?.confidence?.flags).toEqual(
+      expect.arrayContaining(['DEGRADED_SOURCE', 'PARTIAL_ACCOUNT_FAILURE']),
     );
   });
 });

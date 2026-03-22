@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: '社区用户画像分析',
-  description: '第 1 阶段：V2EX 单平台最小闭环的应用入口与分析 API 骨架。',
+  description: '支持单账号分析与手工聚合分析的社区用户画像工作台。',
 };
 
 type RootLayoutProps = Readonly<{

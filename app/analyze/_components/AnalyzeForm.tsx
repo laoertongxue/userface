@@ -1,49 +1,32 @@
 'use client';
 
-import { CSSProperties, FormEvent, useState } from 'react';
+import { CSSProperties, FormEvent, useEffect, useMemo, useState } from 'react';
+import { AnalyzeResultPanel } from '@/app/analyze/_components/AnalyzeResultPanel';
+import { SuggestionPanel } from '@/app/analyze/_components/SuggestionPanel';
+import {
+  buildAnalyzeRequest,
+  buildSuggestRequest,
+  createDefaultClusterDraft,
+  createDraftAccount,
+  dedupeDraftAccounts,
+  getEffectiveAccounts,
+  readClusterDraft,
+  upsertSuggestionDecision,
+  writeClusterDraft,
+} from '@/app/analyze/_lib/clusterDraft';
+import type {
+  AnalyzeError,
+  AnalyzeMode,
+  AnalyzeResponse,
+  ClusterDraft,
+  DraftAccount,
+  SuggestionDecisionStatus,
+  SuggestionResponse,
+  SupportedCommunity,
+} from '@/app/analyze/types';
 
 type AnalyzeStatus = 'idle' | 'loading' | 'success' | 'error';
-type SupportedCommunity = 'v2ex' | 'guozaoke';
-
-type AnalyzeResult = {
-  communityBreakdowns?: Array<{
-    community?: string;
-    handle?: string;
-    metrics?: Record<string, number>;
-    summary?: string;
-    tags?: string[];
-  }>;
-  evidence?: Array<{
-    activityUrl?: string;
-    community?: string;
-    excerpt?: string;
-    label?: string;
-    publishedAt?: string;
-  }>;
-  metrics?: {
-    activeDays?: number;
-    avgTextLength?: number;
-    replyCount?: number;
-    topicCount?: number;
-    totalActivities?: number;
-  };
-  portrait?: {
-    archetype?: string;
-    confidence?: number;
-    summary?: string;
-    tags?: string[];
-  };
-  warnings?: Array<{
-    code?: string;
-    message?: string;
-  }>;
-};
-
-type AnalyzeError = {
-  code: string;
-  details?: unknown;
-  message: string;
-};
+type SuggestStatus = 'idle' | 'loading' | 'success' | 'error';
 
 const communityMeta: Record<
   SupportedCommunity,
@@ -87,20 +70,14 @@ const fieldsetStyle: CSSProperties = {
   border: 0,
 };
 
-function formatValue(value: number | string | undefined): string {
-  if (value === undefined || value === null || value === '') {
+function formatTimestamp(value: string | undefined): string {
+  if (!value) {
     return 'N/A';
   }
 
-  return String(value);
-}
-
-function formatConfidence(value: number | undefined): string {
-  if (value === undefined || Number.isNaN(value)) {
-    return 'N/A';
-  }
-
-  return `${Math.round(value * 100)}%`;
+  return new Date(value).toLocaleString('zh-CN', {
+    hour12: false,
+  });
 }
 
 async function parseErrorResponse(response: Response): Promise<AnalyzeError> {
@@ -122,38 +99,232 @@ async function parseErrorResponse(response: Response): Promise<AnalyzeError> {
   }
 }
 
+function ensureAccountsForMode(mode: AnalyzeMode, accounts: DraftAccount[]): DraftAccount[] {
+  if (mode === 'SINGLE_ACCOUNT') {
+    return accounts.length > 0 ? accounts : [createDraftAccount()];
+  }
+
+  if (accounts.length >= 2) {
+    return accounts;
+  }
+
+  if (accounts.length === 1) {
+    const nextCommunity = accounts[0].community === 'v2ex' ? 'guozaoke' : 'v2ex';
+    return [...accounts, createDraftAccount(nextCommunity)];
+  }
+
+  return [createDraftAccount('v2ex'), createDraftAccount('guozaoke')];
+}
+
 export function AnalyzeForm() {
-  const [community, setCommunity] = useState<SupportedCommunity>('v2ex');
-  const [handle, setHandle] = useState('');
-  const [status, setStatus] = useState<AnalyzeStatus>('idle');
-  const [result, setResult] = useState<AnalyzeResult | null>(null);
-  const [error, setError] = useState<AnalyzeError | null>(null);
-  const [lastSubmitted, setLastSubmitted] = useState<{
-    community: SupportedCommunity;
-    handle: string;
-  } | null>(null);
+  const [draft, setDraft] = useState<ClusterDraft>(createDefaultClusterDraft());
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [analyzeStatus, setAnalyzeStatus] = useState<AnalyzeStatus>('idle');
+  const [suggestStatus, setSuggestStatus] = useState<SuggestStatus>('idle');
+  const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [suggestionResult, setSuggestionResult] = useState<SuggestionResponse | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<AnalyzeError | null>(null);
+  const [suggestError, setSuggestError] = useState<AnalyzeError | null>(null);
+  const [localMessage, setLocalMessage] = useState<string | null>(null);
+  const [lastSubmittedAccounts, setLastSubmittedAccounts] = useState<DraftAccount[]>([]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  useEffect(() => {
+    setDraft(
+      readClusterDraft(typeof window !== 'undefined' ? window.localStorage : null),
+    );
+    setIsHydrated(true);
+  }, []);
 
-    const normalizedHandle = handle.trim();
-    if (!normalizedHandle) {
-      setStatus('error');
-      setResult(null);
-      setError({
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    writeClusterDraft(
+      typeof window !== 'undefined' ? window.localStorage : null,
+      draft,
+    );
+  }, [draft, isHydrated]);
+
+  const singleAccount = draft.accounts[0] ?? createDraftAccount();
+  const effectiveSingleAccounts = useMemo(
+    () => getEffectiveAccounts('SINGLE_ACCOUNT', draft.accounts),
+    [draft.accounts],
+  );
+  const effectiveClusterAccounts = useMemo(
+    () => getEffectiveAccounts('MANUAL_CLUSTER', draft.accounts),
+    [draft.accounts],
+  );
+  const canRequestSuggestions = effectiveClusterAccounts.length >= 2;
+
+  function updateDraftAccounts(nextAccounts: DraftAccount[]) {
+    setDraft((current) => ({
+      ...current,
+      accounts: nextAccounts,
+    }));
+  }
+
+  function handleModeChange(nextMode: AnalyzeMode) {
+    setDraft((current) => ({
+      ...current,
+      mode: nextMode,
+      accounts: ensureAccountsForMode(nextMode, current.accounts),
+    }));
+    setAnalyzeStatus('idle');
+    setSuggestStatus('idle');
+    setAnalyzeError(null);
+    setSuggestError(null);
+    setResult(null);
+    setSuggestionResult(null);
+    setLocalMessage(
+      nextMode === 'SINGLE_ACCOUNT'
+        ? '已切换到单账号模式。若你之前录入了多个账号，它们仍保留在本地草稿中，切回聚合模式后可继续编辑。'
+        : '已切换到手工聚合模式。当前草稿只保存在浏览器 localStorage，不会写入服务端。',
+    );
+  }
+
+  function updateSingleAccount(next: Partial<DraftAccount>) {
+    const first = draft.accounts[0] ?? createDraftAccount();
+    const nextAccounts = [...draft.accounts];
+    nextAccounts[0] = {
+      ...first,
+      ...next,
+    };
+    updateDraftAccounts(nextAccounts);
+  }
+
+  function updateClusterAccount(index: number, next: Partial<DraftAccount>) {
+    const nextAccounts = [...draft.accounts];
+    const current = nextAccounts[index] ?? createDraftAccount();
+    nextAccounts[index] = {
+      ...current,
+      ...next,
+    };
+    updateDraftAccounts(nextAccounts);
+  }
+
+  function addClusterAccount() {
+    updateDraftAccounts([
+      ...draft.accounts,
+      createDraftAccount(draft.accounts[draft.accounts.length - 1]?.community === 'v2ex' ? 'guozaoke' : 'v2ex'),
+    ]);
+  }
+
+  function removeClusterAccount(index: number) {
+    const nextAccounts = draft.accounts.filter((_, accountIndex) => accountIndex !== index);
+    updateDraftAccounts(nextAccounts.length > 0 ? nextAccounts : [createDraftAccount()]);
+  }
+
+  function dedupeCurrentDraft() {
+    const deduped = dedupeDraftAccounts(draft.accounts);
+    const removedCount = Math.max(draft.accounts.length - deduped.length, 0);
+    updateDraftAccounts(deduped.length > 0 ? deduped : [createDraftAccount()]);
+    setLocalMessage(
+      removedCount > 0
+        ? `已清理 ${removedCount} 个重复账号。`
+        : '当前草稿中没有可清理的重复账号。',
+    );
+  }
+
+  function applySuggestionDecision(pairKey: string, status: SuggestionDecisionStatus) {
+    setDraft((current) => ({
+      ...current,
+      suggestionDecisions: upsertSuggestionDecision(current.suggestionDecisions, pairKey, status),
+    }));
+  }
+
+  async function handleSuggest() {
+    const suggestRequest = buildSuggestRequest(draft.accounts);
+
+    if (suggestRequest.accounts.length < 2) {
+      setSuggestStatus('error');
+      setSuggestError({
         code: 'INVALID_INPUT',
-        message: `请输入一个非空的${communityMeta[community].handleLabel}。`,
+        message: '聚合模式下至少需要 2 个去重后的非空账号，才能请求关联建议。',
       });
       return;
     }
 
-    setStatus('loading');
-    setError(null);
+    setSuggestStatus('loading');
+    setSuggestError(null);
+    setLocalMessage(null);
+
+    const dedupedAccounts = dedupeDraftAccounts(draft.accounts);
+    if (dedupedAccounts.length !== draft.accounts.length) {
+      updateDraftAccounts(dedupedAccounts);
+      setLocalMessage('建议请求前已自动清理重复账号。');
+    }
+
+    try {
+      const response = await fetch('/api/identity/suggest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(suggestRequest),
+      });
+
+      if (!response.ok) {
+        const parsedError = await parseErrorResponse(response);
+        setSuggestStatus('error');
+        setSuggestError(parsedError);
+        return;
+      }
+
+      const payload = (await response.json()) as SuggestionResponse;
+      setSuggestionResult(payload);
+      setSuggestStatus('success');
+      setDraft((current) => ({
+        ...current,
+        lastSuggestedAt: new Date().toISOString(),
+      }));
+    } catch {
+      setSuggestStatus('error');
+      setSuggestError({
+        code: 'REQUEST_FAILED',
+        message: '关联建议请求未完成，请检查本地服务或网络状态后重试。',
+      });
+    }
+  }
+
+  async function handleAnalyze(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const requestBody = buildAnalyzeRequest(draft.mode, draft.accounts);
+    const effectiveAccounts = requestBody.identity.accounts;
+
+    if (effectiveAccounts.length === 0) {
+      setAnalyzeStatus('error');
+      setResult(null);
+      setAnalyzeError({
+        code: 'INVALID_INPUT',
+        message:
+          draft.mode === 'SINGLE_ACCOUNT'
+            ? `请输入一个非空的${communityMeta[singleAccount.community].handleLabel}。`
+            : '请至少保留一个非空账号后再发起聚合分析。',
+      });
+      return;
+    }
+
+    const dedupedAccounts = dedupeDraftAccounts(draft.accounts);
+    if (dedupedAccounts.length !== draft.accounts.length) {
+      updateDraftAccounts(dedupedAccounts);
+      setLocalMessage('分析请求前已自动清理重复账号。');
+    } else if (draft.mode === 'MANUAL_CLUSTER' && effectiveAccounts.length === 1) {
+      setLocalMessage('当前聚合草稿去重后只有 1 个账号，本次请求仍会作为合法分析继续执行。');
+    } else {
+      setLocalMessage(null);
+    }
+
+    setAnalyzeStatus('loading');
+    setAnalyzeError(null);
     setResult(null);
-    setLastSubmitted({
-      community,
-      handle: normalizedHandle,
-    });
+    setLastSubmittedAccounts(
+      effectiveAccounts.map((account) => ({
+        community: account.community,
+        handle: account.handle,
+      })),
+    );
 
     try {
       const response = await fetch('/api/analyze', {
@@ -161,153 +332,316 @@ export function AnalyzeForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          identity: {
-            accounts: [
-              {
-                community,
-                handle: normalizedHandle,
-              },
-            ],
-          },
-          options: {
-            locale: 'zh-CN',
-          },
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const parsedError = await parseErrorResponse(response);
-        setStatus('error');
-        setError(parsedError);
+        setAnalyzeStatus('error');
+        setAnalyzeError(parsedError);
         return;
       }
 
-      const payload = (await response.json()) as AnalyzeResult;
+      const payload = (await response.json()) as AnalyzeResponse;
       setResult(payload);
-      setStatus('success');
+      setAnalyzeStatus('success');
+      setDraft((current) => ({
+        ...current,
+        lastAnalyzedAt: new Date().toISOString(),
+      }));
     } catch {
-      setStatus('error');
-      setError({
+      setAnalyzeStatus('error');
+      setAnalyzeError({
         code: 'REQUEST_FAILED',
-        message: '请求未完成，请检查本地服务或网络状态后重试。',
+        message: '分析请求未完成，请检查本地服务或网络状态后重试。',
       });
     }
   }
 
-  const warnings = result?.warnings ?? [];
-  const evidence = result?.evidence ?? [];
-  const communityBreakdowns = result?.communityBreakdowns ?? [];
-  const selectedCommunityMeta = communityMeta[community];
-
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       <section style={cardStyle}>
-        <h2 style={sectionTitleStyle}>输入区</h2>
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-          <fieldset style={fieldsetStyle}>
-            <legend style={{ fontWeight: 600, marginBottom: 8 }}>分析平台</legend>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {(Object.keys(communityMeta) as SupportedCommunity[]).map((item) => (
-                <label
-                  key={item}
+        <h2 style={sectionTitleStyle}>模式切换</h2>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {(['SINGLE_ACCOUNT', 'MANUAL_CLUSTER'] as AnalyzeMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => handleModeChange(mode)}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 999,
+                border: `1px solid ${draft.mode === mode ? '#111827' : '#d1d5db'}`,
+                background: draft.mode === mode ? '#f3f4f6' : '#ffffff',
+                cursor: 'pointer',
+              }}
+            >
+              {mode === 'SINGLE_ACCOUNT' ? '单账号分析' : '手工聚合分析'}
+            </button>
+          ))}
+        </div>
+        <p style={{ marginTop: 12, marginBottom: 0, lineHeight: 1.6, color: '#4b5563' }}>
+          单账号模式继续沿用现有工作流。手工聚合模式允许你在浏览器里维护一个本地 cluster 草稿、请求关联建议，并直接对当前账号列表发起聚合分析。
+        </p>
+      </section>
+
+      <section style={cardStyle}>
+        <h2 style={sectionTitleStyle}>
+          {draft.mode === 'SINGLE_ACCOUNT' ? '单账号输入区' : '聚合草稿编辑区'}
+        </h2>
+        <form onSubmit={handleAnalyze} style={{ display: 'grid', gap: 16 }}>
+          {draft.mode === 'SINGLE_ACCOUNT' ? (
+            <>
+              <fieldset style={fieldsetStyle}>
+                <legend style={{ fontWeight: 600, marginBottom: 8 }}>分析平台</legend>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {(Object.keys(communityMeta) as SupportedCommunity[]).map((item) => (
+                    <label
+                      key={item}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '8px 12px',
+                        borderRadius: 999,
+                        border: `1px solid ${singleAccount.community === item ? '#111827' : '#d1d5db'}`,
+                        background: singleAccount.community === item ? '#f3f4f6' : '#ffffff',
+                        cursor: analyzeStatus === 'loading' ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="community"
+                        value={item}
+                        checked={singleAccount.community === item}
+                        disabled={analyzeStatus === 'loading'}
+                        onChange={() => updateSingleAccount({ community: item })}
+                      />
+                      <span>{communityMeta[item].title}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <p style={{ margin: 0, color: '#4b5563', lineHeight: 1.6 }}>
+                {communityMeta[singleAccount.community].description}
+                {draft.accounts.length > 1 &&
+                  ' 当前本地草稿里仍保留了其他聚合账号，切回手工聚合模式后可继续编辑。'}
+              </p>
+
+              <label htmlFor="single-account-handle" style={{ fontWeight: 600 }}>
+                {communityMeta[singleAccount.community].handleLabel}
+              </label>
+              <input
+                id="single-account-handle"
+                name="handle"
+                type="text"
+                value={singleAccount.handle}
+                onChange={(event) => updateSingleAccount({ handle: event.target.value })}
+                placeholder={communityMeta[singleAccount.community].placeholder}
+                disabled={analyzeStatus === 'loading'}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #9ca3af',
+                  fontSize: 16,
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <p style={{ margin: 0, color: '#4b5563', lineHeight: 1.6 }}>
+                当前 cluster 草稿只保存在浏览器 localStorage 中。suggestion 只用于本地确认，不会自动写入后端事实。
+              </p>
+
+              <div style={{ display: 'grid', gap: 12 }}>
+                {draft.accounts.map((account, index) => (
+                  <div
+                    key={`${account.community}-${index}`}
+                    style={{
+                      display: 'grid',
+                      gap: 8,
+                      padding: 16,
+                      borderRadius: 10,
+                      background: '#f9fafb',
+                      border: '1px solid #e5e7eb',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                      <strong>账号 {index + 1}</strong>
+                      <button
+                        type="button"
+                        onClick={() => removeClusterAccount(index)}
+                        disabled={analyzeStatus === 'loading' || suggestStatus === 'loading'}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: 8,
+                          border: '1px solid #dc2626',
+                          background: '#ffffff',
+                          color: '#dc2626',
+                          cursor:
+                            analyzeStatus === 'loading' || suggestStatus === 'loading'
+                              ? 'not-allowed'
+                              : 'pointer',
+                        }}
+                      >
+                        删除
+                      </button>
+                    </div>
+                    <label style={{ fontWeight: 600 }}>
+                      社区
+                      <select
+                        value={account.community}
+                        onChange={(event) =>
+                          updateClusterAccount(index, {
+                            community: event.target.value as SupportedCommunity,
+                          })
+                        }
+                        disabled={analyzeStatus === 'loading' || suggestStatus === 'loading'}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          marginTop: 6,
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          border: '1px solid #9ca3af',
+                          fontSize: 16,
+                        }}
+                      >
+                        <option value="v2ex">V2EX</option>
+                        <option value="guozaoke">过早客</option>
+                      </select>
+                    </label>
+                    <label style={{ fontWeight: 600 }}>
+                      用户标识
+                      <input
+                        type="text"
+                        value={account.handle}
+                        onChange={(event) => updateClusterAccount(index, { handle: event.target.value })}
+                        placeholder={communityMeta[account.community].placeholder}
+                        disabled={analyzeStatus === 'loading' || suggestStatus === 'loading'}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          marginTop: 6,
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          border: '1px solid #9ca3af',
+                          fontSize: 16,
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={addClusterAccount}
+                  disabled={analyzeStatus === 'loading' || suggestStatus === 'loading'}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '8px 12px',
-                    borderRadius: 999,
-                    border: `1px solid ${community === item ? '#111827' : '#d1d5db'}`,
-                    background: community === item ? '#f3f4f6' : '#ffffff',
-                    cursor: status === 'loading' ? 'not-allowed' : 'pointer',
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    border: '1px solid #111827',
+                    background: '#ffffff',
+                    cursor:
+                      analyzeStatus === 'loading' || suggestStatus === 'loading'
+                        ? 'not-allowed'
+                        : 'pointer',
                   }}
                 >
-                  <input
-                    type="radio"
-                    name="community"
-                    value={item}
-                    checked={community === item}
-                    disabled={status === 'loading'}
-                    onChange={() => {
-                      setCommunity(item);
-                      setStatus('idle');
-                      setError(null);
-                      setResult(null);
-                      setLastSubmitted(null);
-                    }}
-                  />
-                  <span>{communityMeta[item].title}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <p style={{ margin: 0, color: '#4b5563', lineHeight: 1.6 }}>
-            {selectedCommunityMeta.description}
-            切换平台会清空上一次分析结果与错误状态。
-          </p>
-          <label htmlFor="community-handle" style={{ fontWeight: 600 }}>
-            {selectedCommunityMeta.handleLabel}
-          </label>
-          <input
-            id="community-handle"
-            name="handle"
-            type="text"
-            value={handle}
-            onChange={(event) => setHandle(event.target.value)}
-            placeholder={selectedCommunityMeta.placeholder}
-            disabled={status === 'loading'}
-            style={{
-              padding: '10px 12px',
-              borderRadius: 8,
-              border: '1px solid #9ca3af',
-              fontSize: 16,
-            }}
-          />
+                  添加账号
+                </button>
+                <button
+                  type="button"
+                  onClick={dedupeCurrentDraft}
+                  disabled={analyzeStatus === 'loading' || suggestStatus === 'loading'}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    border: '1px solid #6b7280',
+                    background: '#ffffff',
+                    cursor:
+                      analyzeStatus === 'loading' || suggestStatus === 'loading'
+                        ? 'not-allowed'
+                        : 'pointer',
+                  }}
+                >
+                  清理重复账号
+                </button>
+              </div>
+
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  lineHeight: 1.7,
+                }}
+              >
+                <strong>当前草稿概况</strong>
+                <ul style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20 }}>
+                  <li>去重后账号数：{effectiveClusterAccounts.length}</li>
+                  <li>上次建议时间：{formatTimestamp(draft.lastSuggestedAt)}</li>
+                  <li>上次分析时间：{formatTimestamp(draft.lastAnalyzedAt)}</li>
+                </ul>
+              </div>
+            </>
+          )}
+
           <div>
             <button
               type="submit"
-              disabled={status === 'loading'}
+              disabled={analyzeStatus === 'loading'}
               style={{
                 padding: '10px 16px',
                 border: 0,
                 borderRadius: 8,
-                background: status === 'loading' ? '#9ca3af' : '#111827',
+                background: analyzeStatus === 'loading' ? '#9ca3af' : '#111827',
                 color: '#ffffff',
-                cursor: status === 'loading' ? 'not-allowed' : 'pointer',
+                cursor: analyzeStatus === 'loading' ? 'not-allowed' : 'pointer',
               }}
             >
-              {status === 'loading' ? '分析中...' : '开始分析'}
+              {analyzeStatus === 'loading'
+                ? '分析中...'
+                : draft.mode === 'SINGLE_ACCOUNT'
+                  ? '开始分析'
+                  : '开始聚合分析'}
             </button>
           </div>
         </form>
       </section>
 
+      {draft.mode === 'MANUAL_CLUSTER' && (
+        <SuggestionPanel
+          decisionState={draft.suggestionDecisions}
+          error={suggestError}
+          loading={suggestStatus === 'loading'}
+          onRequest={handleSuggest}
+          onUpdateDecision={applySuggestionDecision}
+          requestDisabled={!canRequestSuggestions || analyzeStatus === 'loading'}
+          result={suggestionResult}
+        />
+      )}
+
       <section style={cardStyle}>
-        <h2 style={sectionTitleStyle}>请求状态</h2>
-        {status === 'idle' && (
-          <p style={{ margin: 0, lineHeight: 1.6 }}>
-            还没有发起分析。选择一个平台并输入对应用户标识后，点击“开始分析”。
-          </p>
-        )}
-        {status === 'loading' && (
-          <p style={{ margin: 0, lineHeight: 1.6 }}>
-            正在调用 <code>/api/analyze</code>，当前平台为{' '}
-            <strong>{communityMeta[lastSubmitted?.community ?? community].title}</strong>，请等待结果返回。
-          </p>
-        )}
-        {status === 'success' && (
-          <p style={{ margin: 0, lineHeight: 1.6 }}>
-            分析完成，结果已更新到下方各区域。
-          </p>
-        )}
-        {status === 'error' && (
-          <p style={{ margin: 0, lineHeight: 1.6 }}>
-            分析未完成，请查看下方错误信息。
+        <h2 style={sectionTitleStyle}>工作流状态</h2>
+        <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
+          <li>草稿模式：{draft.mode}</li>
+          <li>Suggestion 状态：{suggestStatus}</li>
+          <li>Analyze 状态：{analyzeStatus}</li>
+        </ul>
+        {localMessage && (
+          <p style={{ marginTop: 12, marginBottom: 0, lineHeight: 1.6, color: '#374151' }}>
+            {localMessage}
           </p>
         )}
       </section>
 
-      {error && (
+      {analyzeError && (
         <section
           style={{
             ...cardStyle,
@@ -315,194 +649,52 @@ export function AnalyzeForm() {
             background: '#fef2f2',
           }}
         >
-          <h2 style={sectionTitleStyle}>错误信息</h2>
+          <h2 style={sectionTitleStyle}>分析错误</h2>
           <p style={{ marginTop: 0 }}>
-            <strong>Code:</strong> {error.code}
+            <strong>Code:</strong> {analyzeError.code}
           </p>
           <p style={{ marginBottom: 0, lineHeight: 1.6 }}>
-            <strong>Message:</strong> {error.message}
+            <strong>Message:</strong> {analyzeError.message}
           </p>
         </section>
       )}
 
-      {!result && status !== 'loading' && !error && (
+      {!result && analyzeStatus !== 'loading' && !analyzeError && (
         <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>空态</h2>
+          <p style={{ marginTop: 0, lineHeight: 1.6 }}>
+            {draft.mode === 'SINGLE_ACCOUNT'
+              ? '选择一个平台并输入一个用户标识后，可以继续做单账号分析。'
+              : '在聚合模式下，可以先维护多个账号草稿、请求 suggestion，再直接对当前账号列表发起聚合分析。'}
+          </p>
+          <p style={{ marginBottom: 0, lineHeight: 1.6 }}>
+            成功返回后，页面会继续展示既有的 portrait / evidence / metrics / communityBreakdowns / warnings；如果 report 提供 cluster 字段，也会额外显示 stable traits、community-specific traits、overlap / divergence、cluster confidence 与 account coverage。
+          </p>
+        </section>
+      )}
+
+      {analyzeStatus === 'loading' && (
+        <section style={cardStyle}>
+          <h2 style={sectionTitleStyle}>分析中</h2>
           <p style={{ margin: 0, lineHeight: 1.6 }}>
-            成功返回后，这里会显示当前单平台分析的 portrait summary、metrics、evidence、community
-            breakdowns 和 warnings。
+            正在调用 <code>/api/analyze</code>。当前模式为{' '}
+            <strong>{draft.mode}</strong>，请等待结果返回。
           </p>
         </section>
       )}
 
       {result && (
-        <>
-          <section style={cardStyle}>
-            <h2 style={sectionTitleStyle}>Portrait Summary</h2>
-            <p style={{ marginTop: 0 }}>
-              <strong>Analyzed Platform:</strong>{' '}
-              {communityMeta[lastSubmitted?.community ?? community].title}
-            </p>
-            <p>
-              <strong>Submitted Handle:</strong>{' '}
-              {lastSubmitted?.handle ?? 'N/A'}
-            </p>
-            <p>
-              <strong>Archetype:</strong>{' '}
-              {result.portrait?.archetype ?? 'N/A'}
-            </p>
-            <p>
-              <strong>Tags:</strong>{' '}
-              {result.portrait?.tags?.length
-                ? result.portrait.tags.join(', ')
-                : 'N/A'}
-            </p>
-            <p>
-              <strong>Confidence:</strong>{' '}
-              {formatConfidence(result.portrait?.confidence)}
-            </p>
-            <p style={{ marginBottom: 0, lineHeight: 1.6 }}>
-              <strong>Summary:</strong> {result.portrait?.summary ?? 'N/A'}
-            </p>
-          </section>
-
-          <section style={cardStyle}>
-            <h2 style={sectionTitleStyle}>Metrics</h2>
-            <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
-              <li>
-                totalActivities: {formatValue(result.metrics?.totalActivities)}
-              </li>
-              <li>topicCount: {formatValue(result.metrics?.topicCount)}</li>
-              <li>replyCount: {formatValue(result.metrics?.replyCount)}</li>
-              <li>
-                avgTextLength: {formatValue(result.metrics?.avgTextLength)}
-              </li>
-              <li>activeDays: {formatValue(result.metrics?.activeDays)}</li>
-            </ul>
-          </section>
-
-          {warnings.length > 0 && (
-            <section
-              style={{
-                ...cardStyle,
-                borderColor: '#d97706',
-                background: '#fffbeb',
-              }}
-            >
-              <h2 style={sectionTitleStyle}>Warnings</h2>
-              <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
-                {warnings.map((warning, index) => (
-                  <li key={`${warning.code ?? 'warning'}-${index}`}>
-                    <strong>{warning.code ?? 'UNKNOWN_WARNING'}</strong>: {' '}
-                    {warning.message ?? 'No message'}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <section style={cardStyle}>
-            <h2 style={sectionTitleStyle}>Evidence</h2>
-            {evidence.length === 0 ? (
-              <p style={{ margin: 0 }}>当前没有可展示的 evidence。</p>
-            ) : (
-              <div style={{ display: 'grid', gap: 12 }}>
-                {evidence.map((item, index) => (
-                  <article
-                    key={`${item.activityUrl ?? 'evidence'}-${index}`}
-                    style={{
-                      padding: 16,
-                      borderRadius: 10,
-                      background: '#f9fafb',
-                      border: '1px solid #e5e7eb',
-                    }}
-                  >
-                    <p style={{ marginTop: 0 }}>
-                      <strong>Label:</strong> {item.label ?? 'N/A'}
-                    </p>
-                    <p style={{ lineHeight: 1.6 }}>
-                      <strong>Excerpt:</strong> {item.excerpt ?? 'N/A'}
-                    </p>
-                    <p>
-                      <strong>Community:</strong> {item.community ?? 'N/A'}
-                    </p>
-                    <p>
-                      <strong>Published At:</strong>{' '}
-                      {item.publishedAt ?? 'N/A'}
-                    </p>
-                    <p style={{ marginBottom: 0 }}>
-                      <strong>Activity URL:</strong>{' '}
-                      {item.activityUrl ? (
-                        <a
-                          href={item.activityUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {item.activityUrl}
-                        </a>
-                      ) : (
-                        'N/A'
-                      )}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section style={cardStyle}>
-            <h2 style={sectionTitleStyle}>Community Breakdowns</h2>
-            {communityBreakdowns.length === 0 ? (
-              <p style={{ margin: 0 }}>
-                当前没有可展示的 community breakdown。
-              </p>
-            ) : (
-              <div style={{ display: 'grid', gap: 12 }}>
-                {communityBreakdowns.map((item, index) => (
-                  <article
-                    key={`${item.community ?? 'community'}-${item.handle ?? index}`}
-                    style={{
-                      padding: 16,
-                      borderRadius: 10,
-                      background: '#f9fafb',
-                      border: '1px solid #e5e7eb',
-                    }}
-                  >
-                    <p style={{ marginTop: 0 }}>
-                      <strong>Community:</strong> {item.community ?? 'N/A'}
-                    </p>
-                    <p>
-                      <strong>Handle:</strong> {item.handle ?? 'N/A'}
-                    </p>
-                    <p>
-                      <strong>Tags:</strong>{' '}
-                      {item.tags?.length ? item.tags.join(', ') : 'N/A'}
-                    </p>
-                    <p style={{ lineHeight: 1.6 }}>
-                      <strong>Summary:</strong> {item.summary ?? 'N/A'}
-                    </p>
-                    <div>
-                      <strong>Metrics:</strong>
-                      <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
-                        {Object.entries(item.metrics ?? {}).length === 0 ? (
-                          <li>N/A</li>
-                        ) : (
-                          Object.entries(item.metrics ?? {}).map(
-                            ([key, value]) => (
-                              <li key={key}>
-                                {key}: {value}
-                              </li>
-                            ),
-                          )
-                        )}
-                      </ul>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        </>
+        <AnalyzeResultPanel
+          mode={draft.mode}
+          result={result}
+          submittedAccounts={
+            lastSubmittedAccounts.length > 0
+              ? lastSubmittedAccounts
+              : draft.mode === 'SINGLE_ACCOUNT'
+                ? effectiveSingleAccounts
+                : effectiveClusterAccounts
+          }
+        />
       )}
     </div>
   );

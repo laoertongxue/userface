@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { BaselinePortraitEngine } from '@/src/contexts/portrait-analysis/domain/services/BaselinePortraitEngine';
 import type { AnalyzePortraitInput } from '@/src/contexts/portrait-analysis/application/dto/AnalyzePortraitInput';
 import { buildFeatureExtractionInput } from '@/src/contexts/portrait-analysis/application/dto/FeatureExtractionInput';
+import { createIdentityCluster } from '@/src/contexts/identity-resolution/domain/aggregates/IdentityCluster';
 import { ArchetypeClassificationService } from '@/src/contexts/portrait-analysis/domain/services/ArchetypeClassificationService';
 import { ConfidenceScoringService } from '@/src/contexts/portrait-analysis/domain/services/ConfidenceScoringService';
 import { CrossCommunitySynthesisService } from '@/src/contexts/portrait-analysis/domain/services/CrossCommunitySynthesisService';
@@ -11,15 +12,16 @@ import { SignalDerivationService } from '@/src/contexts/portrait-analysis/domain
 import { TagCompositionService } from '@/src/contexts/portrait-analysis/domain/services/TagCompositionService';
 
 const minimalInput: AnalyzePortraitInput = {
-  identityCluster: {
+  identityCluster: createIdentityCluster({
     accounts: [
       {
         community: 'v2ex',
         handle: 'sample-user',
       },
     ],
-    mergeSuggestions: [],
-  },
+    mode: 'SINGLE_ACCOUNT',
+    now: '2026-03-22T00:00:00.000Z',
+  }),
   snapshots: [
     {
       ref: {
@@ -134,7 +136,7 @@ describe('BaselinePortraitEngine', () => {
       buildFeatureExtractionInput(minimalInput),
     );
     const evidenceSelection = new EvidenceSelectionService().select({
-      activities: minimalInput.activityStream.activities,
+      activities: minimalInput.activityStream!.activities,
       featureVector,
     });
     const confidenceProfile = new ConfidenceScoringService().score({

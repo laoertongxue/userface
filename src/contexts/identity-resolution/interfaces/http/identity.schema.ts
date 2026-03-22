@@ -8,6 +8,7 @@ export const externalAccountSchema = z.object({
   handle: nonEmptyStringSchema,
   uid: nonEmptyStringSchema.optional(),
   homepageUrl: z.string().url().optional(),
+  displayName: nonEmptyStringSchema.optional(),
 });
 
 export const identitySchema = z.object({
@@ -17,4 +18,7 @@ export const identitySchema = z.object({
 
 export const identitySuggestRequestSchema = z.object({
   accounts: z.array(externalAccountSchema).min(1),
+  maxSuggestions: z.number().int().positive().max(20).optional(),
+  includeWeakSignals: z.boolean().optional(),
+  locale: z.enum(['zh-CN', 'en-US']).optional(),
 });

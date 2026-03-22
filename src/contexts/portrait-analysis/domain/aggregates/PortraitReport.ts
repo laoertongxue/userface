@@ -6,6 +6,14 @@ export type PortraitEvidence = {
   publishedAt: string;
 };
 
+export type ReportAccountRef = {
+  community: string;
+  handle: string;
+  uid?: string;
+  homepageUrl?: string;
+  displayName?: string;
+};
+
 export type PortraitMetrics = {
   totalActivities: number;
   topicCount: number;
@@ -34,10 +42,72 @@ export type PortraitWarning = {
   message: string;
 };
 
+export type AggregatedTrait = {
+  code: string;
+  displayName: string;
+  confidence: number;
+  supportingSignals: string[];
+  sourceCommunities: string[];
+};
+
+export type CommunitySpecificTrait = {
+  code: string;
+  displayName: string;
+  rationale: string;
+  strength?: number;
+};
+
+export type OverlapInsight = {
+  code: string;
+  communities: string[];
+  rationale: string;
+  dominantCommunity?: string;
+  comparedCommunities?: string[];
+};
+
+export type AccountCoverageFailure = {
+  account: ReportAccountRef;
+  reason?: string;
+};
+
+export type AccountCoverageEntry = {
+  account: ReportAccountRef;
+  status: 'REQUESTED' | 'SUCCESS' | 'FAILED';
+  degraded: boolean;
+  warningCodes: string[];
+  reason?: string;
+};
+
+export type AccountCoverage = {
+  requestedAccounts: ReportAccountRef[];
+  successfulAccounts: ReportAccountRef[];
+  failedAccounts: AccountCoverageFailure[];
+  successfulCount: number;
+  failedCount: number;
+  activeCommunities: string[];
+  accountStatuses?: AccountCoverageEntry[];
+};
+
+export type ClusterConfidenceSummary = {
+  overall: number;
+  reasons: string[];
+  flags: string[];
+};
+
+export type ClusterInsights = {
+  stableTraits: AggregatedTrait[];
+  communitySpecificTraits: Record<string, CommunitySpecificTrait[]>;
+  overlap?: OverlapInsight[];
+  divergence?: OverlapInsight[];
+  confidence?: ClusterConfidenceSummary;
+  accountCoverage: AccountCoverage;
+};
+
 export type PortraitReport = {
   portrait: Portrait;
   evidence: PortraitEvidence[];
   metrics: PortraitMetrics;
   communityBreakdowns: CommunityBreakdown[];
   warnings: PortraitWarning[];
+  cluster?: ClusterInsights;
 };

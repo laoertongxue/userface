@@ -24,6 +24,15 @@ describe('portrait report regression', () => {
         },
         communityBreakdowns: expect.any(Array),
         warnings: expect.any(Array),
+        cluster: expect.objectContaining({
+          stableTraits: expect.any(Array),
+          communitySpecificTraits: expect.any(Object),
+          accountCoverage: expect.objectContaining({
+            requestedAccounts: expect.any(Array),
+            successfulAccounts: expect.any(Array),
+            failedAccounts: expect.any(Array),
+          }),
+        }),
       });
     }
   });
@@ -112,5 +121,22 @@ describe('portrait report regression', () => {
         }),
       ]),
     );
+  });
+
+  test('cluster insights stay minimal for single-community and richer for cross-community cases', () => {
+    const single = runPortraitAnalysis(
+      getGoldenCase('discussion-heavy-single-community').input,
+    ).report;
+    const cross = runPortraitAnalysis(getGoldenCase('cross-community-balanced').input).report;
+
+    expect(single.cluster?.stableTraits.length ?? 0).toBeGreaterThan(0);
+    expect(single.cluster?.overlap ?? []).toEqual([]);
+    expect(single.cluster?.accountCoverage.successfulCount).toBe(1);
+
+    expect(cross.cluster?.stableTraits.length ?? 0).toBeGreaterThan(0);
+    expect(Object.keys(cross.cluster?.communitySpecificTraits ?? {})).toEqual(
+      expect.arrayContaining(['guozaoke', 'v2ex']),
+    );
+    expect(cross.cluster?.accountCoverage.successfulCount).toBe(2);
   });
 });

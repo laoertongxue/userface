@@ -1,0 +1,20 @@
+export const CLUSTER_REPORT_POLICY = {
+  highConfidenceThreshold: 0.65,
+  stableTraitsHighConfidenceLimit: 4,
+  stableTraitsLowConfidenceLimit: 2,
+  communitySpecificTraitsLimit: 2,
+  overlapLimit: 4,
+  divergenceLimit: 4,
+  clusterConfidence: {
+    baseWeight: 0.72,
+    coverageWeight: 0.18,
+    evidenceWeight: 0.1,
+    perSuccessfulAccountBonus: 0.04,
+    maxSuccessfulAccountBonus: 0.12,
+    perCommunityBonus: 0.03,
+    maxCommunityBonus: 0.06,
+    perFailedAccountPenalty: 0.08,
+    maxFailedAccountPenalty: 0.24,
+    degradedPenalty: 0.12,
+  },
+} as const;

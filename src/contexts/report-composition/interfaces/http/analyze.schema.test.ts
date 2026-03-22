@@ -32,6 +32,29 @@ describe('analyzeRequestSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  test('accepts multiple accounts while keeping the existing analyze request shape', () => {
+    const result = analyzeRequestSchema.safeParse({
+      identity: {
+        label: 'dual-community-subject',
+        accounts: [
+          {
+            community: 'v2ex',
+            handle: 'alpha',
+          },
+          {
+            community: 'guozaoke',
+            handle: 'alpha',
+          },
+        ],
+      },
+      options: {
+        locale: 'zh-CN',
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   test('rejects unsupported communities', () => {
     const result = analyzeRequestSchema.safeParse({
       identity: {

@@ -15,10 +15,10 @@ export default function AnalyzePage() {
         </a>
       </div>
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ marginTop: 0, marginBottom: 12 }}>单平台社区用户分析</h1>
+        <h1 style={{ marginTop: 0, marginBottom: 12 }}>社区画像分析工作台</h1>
         <p style={{ margin: 0, lineHeight: 1.6 }}>
-          选择 <strong>V2EX</strong> 或 <strong>过早客</strong>，输入该平台的一个用户标识后，
-          页面会通过 <code>/api/analyze</code> 发起单平台分析，并展示当前阶段最关键的结果，便于手工验收。
+          当前页面同时支持 <strong>单账号分析</strong> 与 <strong>手工聚合分析</strong>。
+          你可以直接分析一个 V2EX / 过早客账号，也可以在本地维护多个账号草稿、请求关联建议，并基于当前草稿调用 <code>/api/analyze</code> 做聚合画像分析。
         </p>
       </header>
       <AnalyzeForm />

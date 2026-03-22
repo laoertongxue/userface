@@ -1,4 +1,5 @@
 import type { AnalyzePortraitInput } from '@/src/contexts/portrait-analysis/application/dto/AnalyzePortraitInput';
+import type { ClusterMergeResult } from '@/src/contexts/portrait-analysis/application/dto/ClusterMergeResult';
 import type { RuleEvaluationResult } from '@/src/contexts/portrait-analysis/application/dto/RuleEvaluationResult';
 import { ArchetypeClassificationService } from '@/src/contexts/portrait-analysis/domain/services/ArchetypeClassificationService';
 import { buildFeatureExtractionInput } from '@/src/contexts/portrait-analysis/application/dto/FeatureExtractionInput';
@@ -6,6 +7,8 @@ import {
   BaselinePortraitEngine,
   type BaselinePortraitAnalysis,
 } from '@/src/contexts/portrait-analysis/domain/services/BaselinePortraitEngine';
+import { ActivityDeduplicationService } from '@/src/contexts/portrait-analysis/domain/services/ActivityDeduplicationService';
+import { ClusterSnapshotMergeService } from '@/src/contexts/portrait-analysis/domain/services/ClusterSnapshotMergeService';
 import { ConfidenceScoringService } from '@/src/contexts/portrait-analysis/domain/services/ConfidenceScoringService';
 import { CrossCommunitySynthesisService } from '@/src/contexts/portrait-analysis/domain/services/CrossCommunitySynthesisService';
 import { EvidenceSelectionService } from '@/src/contexts/portrait-analysis/domain/services/EvidenceSelectionService';
@@ -14,7 +17,9 @@ import { SignalDerivationService } from '@/src/contexts/portrait-analysis/domain
 import { TagCompositionService } from '@/src/contexts/portrait-analysis/domain/services/TagCompositionService';
 
 export class AnalyzeIdentityCluster {
+  private readonly activityDeduplicationService: ActivityDeduplicationService;
   private readonly archetypeClassificationService: ArchetypeClassificationService;
+  private readonly clusterSnapshotMergeService: ClusterSnapshotMergeService;
   private readonly confidenceScoringService: ConfidenceScoringService;
   private readonly crossCommunitySynthesisService: CrossCommunitySynthesisService;
   private readonly evidenceSelectionService: EvidenceSelectionService;
@@ -24,6 +29,8 @@ export class AnalyzeIdentityCluster {
   private readonly tagCompositionService: TagCompositionService;
 
   constructor(
+    clusterSnapshotMergeService: ClusterSnapshotMergeService = new ClusterSnapshotMergeService(),
+    activityDeduplicationService: ActivityDeduplicationService = new ActivityDeduplicationService(),
     featureExtractionService: FeatureExtractionService = new FeatureExtractionService(),
     evidenceSelectionService: EvidenceSelectionService = new EvidenceSelectionService(),
     confidenceScoringService: ConfidenceScoringService = new ConfidenceScoringService(),
@@ -33,7 +40,9 @@ export class AnalyzeIdentityCluster {
     crossCommunitySynthesisService: CrossCommunitySynthesisService = new CrossCommunitySynthesisService(),
     engine: BaselinePortraitEngine = new BaselinePortraitEngine(),
   ) {
+    this.activityDeduplicationService = activityDeduplicationService;
     this.archetypeClassificationService = archetypeClassificationService;
+    this.clusterSnapshotMergeService = clusterSnapshotMergeService;
     this.confidenceScoringService = confidenceScoringService;
     this.crossCommunitySynthesisService = crossCommunitySynthesisService;
     this.evidenceSelectionService = evidenceSelectionService;
@@ -43,10 +52,49 @@ export class AnalyzeIdentityCluster {
     this.tagCompositionService = tagCompositionService;
   }
 
+  private buildClusterMergeResult(input: AnalyzePortraitInput): ClusterMergeResult {
+    if (input.clusterMergeResult) {
+      return input.clusterMergeResult;
+    }
+
+    return this.clusterSnapshotMergeService.merge(
+      input.fetchResult ?? {
+        identityCluster: input.identityCluster,
+        successfulSnapshots: input.snapshots.map((snapshot) => ({
+          account: {
+            ...snapshot.ref,
+          },
+          snapshot,
+        })),
+        failedAccounts: [],
+        totalAccounts: input.identityCluster.accounts.length,
+        successfulCount: input.snapshots.length,
+        failedCount: 0,
+        degraded: input.snapshots.some(
+          (snapshot) => snapshot.diagnostics.degraded || snapshot.warnings.length > 0,
+        ),
+      },
+    );
+  }
+
   execute(input: AnalyzePortraitInput): BaselinePortraitAnalysis {
-    const featureVector = this.featureExtractionService.extract(buildFeatureExtractionInput(input));
+    const clusterMergeResult = this.buildClusterMergeResult(input);
+    const deduplicationResult = this.activityDeduplicationService.dedupe(
+      clusterMergeResult.mergedActivities,
+    );
+    const activityStream = input.activityStream ?? {
+      activities: deduplicationResult.dedupedActivities,
+    };
+    const normalizedInput: AnalyzePortraitInput = {
+      ...input,
+      activityStream,
+      clusterMergeResult,
+    };
+    const featureVector = this.featureExtractionService.extract(
+      buildFeatureExtractionInput(normalizedInput),
+    );
     const evidenceSelection = this.evidenceSelectionService.select({
-      activities: input.activityStream.activities,
+      activities: activityStream.activities,
       featureVector,
     });
     const confidenceProfile = this.confidenceScoringService.score({
@@ -84,7 +132,7 @@ export class AnalyzeIdentityCluster {
     };
 
     return this.engine.execute({
-      portraitInput: input,
+      portraitInput: normalizedInput,
       featureVector,
       evidenceSelection,
       confidenceProfile,

@@ -2,9 +2,10 @@ import { describe, expect, test } from 'vitest';
 import { AnalyzeIdentityCluster } from '@/src/contexts/portrait-analysis/application/use-cases/AnalyzeIdentityCluster';
 import type { AnalyzePortraitInput } from '@/src/contexts/portrait-analysis/application/dto/AnalyzePortraitInput';
 import { ComposePortraitReport } from '@/src/contexts/report-composition/application/use-cases/ComposePortraitReport';
+import { createIdentityCluster } from '@/src/contexts/identity-resolution/domain/aggregates/IdentityCluster';
 
 const compatibilityInput: AnalyzePortraitInput = {
-  identityCluster: {
+  identityCluster: createIdentityCluster({
     accounts: [
       {
         community: 'v2ex',
@@ -15,8 +16,22 @@ const compatibilityInput: AnalyzePortraitInput = {
         handle: 'beta',
       },
     ],
-    mergeSuggestions: [],
-  },
+    links: [
+      {
+        from: {
+          community: 'v2ex',
+          handle: 'alpha',
+        },
+        to: {
+          community: 'guozaoke',
+          handle: 'beta',
+        },
+        source: 'USER_ASSERTED',
+      },
+    ],
+    mode: 'MANUAL_CLUSTER',
+    now: '2026-03-22T00:00:00.000Z',
+  }),
   snapshots: [
     {
       ref: {
@@ -179,6 +194,18 @@ describe('AnalyzeIdentityCluster', () => {
           message: 'Replies were not available for beta.',
         },
       ],
+      cluster: expect.objectContaining({
+        stableTraits: expect.any(Array),
+        communitySpecificTraits: expect.any(Object),
+        confidence: expect.objectContaining({
+          overall: expect.any(Number),
+        }),
+        accountCoverage: expect.objectContaining({
+          requestedAccounts: expect.any(Array),
+          successfulAccounts: expect.any(Array),
+          failedAccounts: expect.any(Array),
+        }),
+      }),
     });
     expect(report.evidence.length).toBeLessThanOrEqual(5);
   });
