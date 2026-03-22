@@ -1,0 +1,17 @@
+export const LONG_FORM_THRESHOLD_CHARS = 200;
+export const SUBSTANTIVE_TEXT_THRESHOLD_CHARS = 20;
+export const SUFFICIENT_DATA_MIN_ACTIVITIES = 8;
+export const SUFFICIENT_DATA_MIN_ACTIVE_DAYS = 3;
+export const SUFFICIENT_DATA_MIN_EVIDENCE_DENSITY = 0.5;
+export const DOMINANT_NODE_LIMIT = 5;
+
+export const FEATURE_EXTRACTION_POLICY = {
+  dominantNodeLimit: DOMINANT_NODE_LIMIT,
+  longFormThresholdChars: LONG_FORM_THRESHOLD_CHARS,
+  substantiveTextThresholdChars: SUBSTANTIVE_TEXT_THRESHOLD_CHARS,
+  sufficientData: {
+    minActivities: SUFFICIENT_DATA_MIN_ACTIVITIES,
+    minActiveDays: SUFFICIENT_DATA_MIN_ACTIVE_DAYS,
+    minEvidenceDensity: SUFFICIENT_DATA_MIN_EVIDENCE_DENSITY,
+  },
+} as const;

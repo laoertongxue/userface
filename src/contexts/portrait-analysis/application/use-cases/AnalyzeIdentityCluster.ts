@@ -1,101 +1,94 @@
 import type { AnalyzePortraitInput } from '@/src/contexts/portrait-analysis/application/dto/AnalyzePortraitInput';
-import type { PortraitReport } from '@/src/contexts/portrait-analysis/domain/aggregates/PortraitReport';
-import { analysisConfig } from '@/src/config/analysis';
-import { countDistinctDays } from '@/src/shared/utils/date';
-import { truncateText } from '@/src/shared/utils/text';
+import type { RuleEvaluationResult } from '@/src/contexts/portrait-analysis/application/dto/RuleEvaluationResult';
+import { ArchetypeClassificationService } from '@/src/contexts/portrait-analysis/domain/services/ArchetypeClassificationService';
+import { buildFeatureExtractionInput } from '@/src/contexts/portrait-analysis/application/dto/FeatureExtractionInput';
+import {
+  BaselinePortraitEngine,
+  type BaselinePortraitAnalysis,
+} from '@/src/contexts/portrait-analysis/domain/services/BaselinePortraitEngine';
+import { ConfidenceScoringService } from '@/src/contexts/portrait-analysis/domain/services/ConfidenceScoringService';
+import { CrossCommunitySynthesisService } from '@/src/contexts/portrait-analysis/domain/services/CrossCommunitySynthesisService';
+import { EvidenceSelectionService } from '@/src/contexts/portrait-analysis/domain/services/EvidenceSelectionService';
+import { FeatureExtractionService } from '@/src/contexts/portrait-analysis/domain/services/FeatureExtractionService';
+import { SignalDerivationService } from '@/src/contexts/portrait-analysis/domain/services/SignalDerivationService';
+import { TagCompositionService } from '@/src/contexts/portrait-analysis/domain/services/TagCompositionService';
 
 export class AnalyzeIdentityCluster {
-  execute(input: AnalyzePortraitInput): PortraitReport {
-    const activities = input.activityStream.activities;
-    const topicCount = activities.filter((activity) => activity.type === 'topic').length;
-    const replyCount = activities.filter((activity) => activity.type === 'reply').length;
-    const totalLength = activities.reduce((sum, activity) => sum + activity.contentText.length, 0);
-    const avgTextLength = activities.length > 0 ? Math.round(totalLength / activities.length) : 0;
-    const activeDays = countDistinctDays(activities.map((activity) => activity.publishedAt));
-    const activeCommunities = new Set(activities.map((activity) => activity.community)).size;
-    const metrics = {
-      totalActivities: activities.length,
-      topicCount,
-      replyCount,
-      avgTextLength,
-      activeDays,
+  private readonly archetypeClassificationService: ArchetypeClassificationService;
+  private readonly confidenceScoringService: ConfidenceScoringService;
+  private readonly crossCommunitySynthesisService: CrossCommunitySynthesisService;
+  private readonly evidenceSelectionService: EvidenceSelectionService;
+  private readonly featureExtractionService: FeatureExtractionService;
+  private readonly engine: BaselinePortraitEngine;
+  private readonly signalDerivationService: SignalDerivationService;
+  private readonly tagCompositionService: TagCompositionService;
+
+  constructor(
+    featureExtractionService: FeatureExtractionService = new FeatureExtractionService(),
+    evidenceSelectionService: EvidenceSelectionService = new EvidenceSelectionService(),
+    confidenceScoringService: ConfidenceScoringService = new ConfidenceScoringService(),
+    signalDerivationService: SignalDerivationService = new SignalDerivationService(),
+    tagCompositionService: TagCompositionService = new TagCompositionService(),
+    archetypeClassificationService: ArchetypeClassificationService = new ArchetypeClassificationService(),
+    crossCommunitySynthesisService: CrossCommunitySynthesisService = new CrossCommunitySynthesisService(),
+    engine: BaselinePortraitEngine = new BaselinePortraitEngine(),
+  ) {
+    this.archetypeClassificationService = archetypeClassificationService;
+    this.confidenceScoringService = confidenceScoringService;
+    this.crossCommunitySynthesisService = crossCommunitySynthesisService;
+    this.evidenceSelectionService = evidenceSelectionService;
+    this.featureExtractionService = featureExtractionService;
+    this.engine = engine;
+    this.signalDerivationService = signalDerivationService;
+    this.tagCompositionService = tagCompositionService;
+  }
+
+  execute(input: AnalyzePortraitInput): BaselinePortraitAnalysis {
+    const featureVector = this.featureExtractionService.extract(buildFeatureExtractionInput(input));
+    const evidenceSelection = this.evidenceSelectionService.select({
+      activities: input.activityStream.activities,
+      featureVector,
+    });
+    const confidenceProfile = this.confidenceScoringService.score({
+      featureVector,
+      evidenceSelection,
+    });
+    const signals = this.signalDerivationService.derive({
+      featureVector,
+      confidenceProfile,
+      selectedEvidence: evidenceSelection.selected,
+    });
+    const tags = this.tagCompositionService.compose({
+      signals,
+      confidenceProfile,
+    });
+    const primaryArchetype = this.archetypeClassificationService.classify({
+      featureVector,
+      signals,
+      tags,
+      confidenceProfile,
+    });
+    const communitySynthesis = this.crossCommunitySynthesisService.synthesize({
+      featureVector,
+      signals,
+      tags,
+      selectedEvidence: evidenceSelection.selected,
+      confidenceProfile,
+    });
+    const ruleEvaluation: RuleEvaluationResult = {
+      primaryArchetype,
+      signals,
+      tags,
+      stableTraits: communitySynthesis.stableTraits,
+      communityInsights: communitySynthesis.communityInsights,
     };
 
-    const tags: string[] = [];
-
-    if (activeCommunities > 1) {
-      tags.push('cross-community');
-    }
-
-    if (replyCount > topicCount) {
-      tags.push('discussion-heavy');
-    } else if (topicCount > 0) {
-      tags.push('topic-led');
-    }
-
-    if (activities.length >= 30) {
-      tags.push('high-output');
-    }
-
-    if (avgTextLength >= 180) {
-      tags.push('long-form');
-    }
-
-    const portrait =
-      activities.length === 0
-        ? {
-            archetype: 'insufficient-data',
-            tags: [],
-            summary:
-              'No analyzable activities are available yet. Connector scaffolds are in place, but live fetching is not implemented.',
-            confidence: 0.15,
-          }
-        : {
-            archetype: replyCount >= topicCount ? 'discussion-oriented' : 'topic-oriented',
-            tags,
-            summary: `Observed ${activities.length} activities across ${Math.max(
-              activeCommunities,
-              1,
-            )} communities over ${Math.max(activeDays, 1)} active days. The current portrait is fully rule-based and ready to be augmented by connector-specific evidence later.`,
-            confidence: Math.min(0.92, 0.35 + activities.length * 0.01),
-          };
-
-    return {
-      portrait,
-      evidence: activities.slice(0, analysisConfig.evidenceLimit).map((activity) => ({
-        label: activity.type === 'topic' ? 'Representative topic' : 'Representative reply',
-        excerpt: truncateText(activity.excerpt || activity.contentText, 180),
-        activityUrl: activity.url,
-        community: activity.community,
-        publishedAt: activity.publishedAt,
-      })),
-      metrics,
-      communityBreakdowns: input.snapshots.map((snapshot) => {
-        const snapshotActivities = activities.filter(
-          (activity) =>
-            activity.community === snapshot.ref.community && activity.handle === snapshot.ref.handle,
-        );
-        const snapshotTopics = snapshotActivities.filter((activity) => activity.type === 'topic').length;
-        const snapshotReplies = snapshotActivities.filter(
-          (activity) => activity.type === 'reply',
-        ).length;
-
-        return {
-          community: snapshot.ref.community,
-          handle: snapshot.ref.handle,
-          tags: snapshotActivities.length === 0 ? ['pending-connector'] : tags,
-          summary:
-            snapshotActivities.length === 0
-              ? `${snapshot.ref.community} connector is scaffolded but has not produced analyzable activities yet.`
-              : `Collected ${snapshotActivities.length} activities from ${snapshot.ref.community}.`,
-          metrics: {
-            totalActivities: snapshotActivities.length,
-            topicCount: snapshotTopics,
-            replyCount: snapshotReplies,
-          },
-        };
-      }),
-      warnings: input.snapshots.flatMap((snapshot) => snapshot.warnings),
-    };
+    return this.engine.execute({
+      portraitInput: input,
+      featureVector,
+      evidenceSelection,
+      confidenceProfile,
+      ruleEvaluation,
+    });
   }
 }

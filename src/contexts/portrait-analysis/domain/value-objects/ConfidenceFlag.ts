@@ -1,0 +1,10 @@
+export const CONFIDENCE_FLAGS = [
+  'LOW_ACTIVITY_VOLUME',
+  'LOW_ACTIVE_DAYS',
+  'LOW_TEXT_DENSITY',
+  'LOW_EVIDENCE_COVERAGE',
+  'DEGRADED_SOURCE',
+  'CROSS_COMMUNITY_STRONGER_BASIS',
+] as const;
+
+export type ConfidenceFlag = (typeof CONFIDENCE_FLAGS)[number];

@@ -1,0 +1,11 @@
+export const ARCHETYPE_CODES = [
+  'INSUFFICIENT_DATA',
+  'DISCUSSION_ORIENTED',
+  'TOPIC_ORIENTED',
+  'COMMUNITY_PARTICIPANT',
+  'OBSERVER',
+  'PROBLEM_SOLVER',
+  'INFORMATION_CURATOR',
+] as const;
+
+export type ArchetypeCode = (typeof ARCHETYPE_CODES)[number];

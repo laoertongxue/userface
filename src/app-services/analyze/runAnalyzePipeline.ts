@@ -22,11 +22,11 @@ export async function runAnalyzePipeline(input: AnalyzeRequest) {
     },
   );
   const activityStream = new BuildCanonicalActivityStream().execute(snapshots);
-  const report = new AnalyzeIdentityCluster().execute({
+  const analysis = new AnalyzeIdentityCluster().execute({
     identityCluster,
     snapshots,
     activityStream,
   });
 
-  return new ComposePortraitReport().execute(report);
+  return new ComposePortraitReport().execute(analysis);
 }
