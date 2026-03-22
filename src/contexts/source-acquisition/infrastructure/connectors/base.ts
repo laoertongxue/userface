@@ -45,7 +45,7 @@ export abstract class StubCommunityConnector implements CommunityConnector {
     };
   }
 
-  async probe(ref: ExternalAccountRef): Promise<{
+  async probe(ref: ExternalAccountRef, _ctx: AcquisitionContext): Promise<{
     ok: boolean;
     community: CommunityConnector['community'];
     ref: ExternalAccountRef;

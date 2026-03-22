@@ -1,8 +1,9 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { CSSProperties, FormEvent, useState } from 'react';
 
 type AnalyzeStatus = 'idle' | 'loading' | 'success' | 'error';
+type SupportedCommunity = 'v2ex' | 'guozaoke';
 
 type AnalyzeResult = {
   communityBreakdowns?: Array<{
@@ -44,17 +45,46 @@ type AnalyzeError = {
   message: string;
 };
 
-const cardStyle: React.CSSProperties = {
+const communityMeta: Record<
+  SupportedCommunity,
+  {
+    description: string;
+    handleLabel: string;
+    placeholder: string;
+    title: string;
+  }
+> = {
+  guozaoke: {
+    description: '公开页面抓取，输入过早客用户 ID / handle。',
+    handleLabel: '过早客用户 ID / handle',
+    placeholder: '例如：sample-user',
+    title: '过早客',
+  },
+  v2ex: {
+    description: '公开接口 + 公开页面抓取，输入 V2EX 用户名。',
+    handleLabel: 'V2EX 用户名',
+    placeholder: '例如：Livid',
+    title: 'V2EX',
+  },
+};
+
+const cardStyle: CSSProperties = {
   padding: 20,
   border: '1px solid #d1d5db',
   borderRadius: 12,
   background: '#ffffff',
 };
 
-const sectionTitleStyle: React.CSSProperties = {
+const sectionTitleStyle: CSSProperties = {
   marginTop: 0,
   marginBottom: 12,
   fontSize: 20,
+};
+
+const fieldsetStyle: CSSProperties = {
+  margin: 0,
+  padding: 0,
+  border: 0,
 };
 
 function formatValue(value: number | string | undefined): string {
@@ -93,10 +123,15 @@ async function parseErrorResponse(response: Response): Promise<AnalyzeError> {
 }
 
 export function AnalyzeForm() {
+  const [community, setCommunity] = useState<SupportedCommunity>('v2ex');
   const [handle, setHandle] = useState('');
   const [status, setStatus] = useState<AnalyzeStatus>('idle');
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<AnalyzeError | null>(null);
+  const [lastSubmitted, setLastSubmitted] = useState<{
+    community: SupportedCommunity;
+    handle: string;
+  } | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -107,7 +142,7 @@ export function AnalyzeForm() {
       setResult(null);
       setError({
         code: 'INVALID_INPUT',
-        message: '请输入一个非空的 V2EX 用户名。',
+        message: `请输入一个非空的${communityMeta[community].handleLabel}。`,
       });
       return;
     }
@@ -115,6 +150,10 @@ export function AnalyzeForm() {
     setStatus('loading');
     setError(null);
     setResult(null);
+    setLastSubmitted({
+      community,
+      handle: normalizedHandle,
+    });
 
     try {
       const response = await fetch('/api/analyze', {
@@ -126,7 +165,7 @@ export function AnalyzeForm() {
           identity: {
             accounts: [
               {
-                community: 'v2ex',
+                community,
                 handle: normalizedHandle,
               },
             ],
@@ -159,22 +198,63 @@ export function AnalyzeForm() {
   const warnings = result?.warnings ?? [];
   const evidence = result?.evidence ?? [];
   const communityBreakdowns = result?.communityBreakdowns ?? [];
+  const selectedCommunityMeta = communityMeta[community];
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       <section style={cardStyle}>
         <h2 style={sectionTitleStyle}>输入区</h2>
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-          <label htmlFor="v2ex-handle" style={{ fontWeight: 600 }}>
-            V2EX 用户名
+          <fieldset style={fieldsetStyle}>
+            <legend style={{ fontWeight: 600, marginBottom: 8 }}>分析平台</legend>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {(Object.keys(communityMeta) as SupportedCommunity[]).map((item) => (
+                <label
+                  key={item}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 12px',
+                    borderRadius: 999,
+                    border: `1px solid ${community === item ? '#111827' : '#d1d5db'}`,
+                    background: community === item ? '#f3f4f6' : '#ffffff',
+                    cursor: status === 'loading' ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="community"
+                    value={item}
+                    checked={community === item}
+                    disabled={status === 'loading'}
+                    onChange={() => {
+                      setCommunity(item);
+                      setStatus('idle');
+                      setError(null);
+                      setResult(null);
+                      setLastSubmitted(null);
+                    }}
+                  />
+                  <span>{communityMeta[item].title}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <p style={{ margin: 0, color: '#4b5563', lineHeight: 1.6 }}>
+            {selectedCommunityMeta.description}
+            切换平台会清空上一次分析结果与错误状态。
+          </p>
+          <label htmlFor="community-handle" style={{ fontWeight: 600 }}>
+            {selectedCommunityMeta.handleLabel}
           </label>
           <input
-            id="v2ex-handle"
+            id="community-handle"
             name="handle"
             type="text"
             value={handle}
             onChange={(event) => setHandle(event.target.value)}
-            placeholder="例如：Livid"
+            placeholder={selectedCommunityMeta.placeholder}
             disabled={status === 'loading'}
             style={{
               padding: '10px 12px',
@@ -206,12 +286,13 @@ export function AnalyzeForm() {
         <h2 style={sectionTitleStyle}>请求状态</h2>
         {status === 'idle' && (
           <p style={{ margin: 0, lineHeight: 1.6 }}>
-            还没有发起分析。输入一个 V2EX 用户名后点击“开始分析”。
+            还没有发起分析。选择一个平台并输入对应用户标识后，点击“开始分析”。
           </p>
         )}
         {status === 'loading' && (
           <p style={{ margin: 0, lineHeight: 1.6 }}>
-            正在调用 <code>/api/analyze</code>，请等待结果返回。
+            正在调用 <code>/api/analyze</code>，当前平台为{' '}
+            <strong>{communityMeta[lastSubmitted?.community ?? community].title}</strong>，请等待结果返回。
           </p>
         )}
         {status === 'success' && (
@@ -248,7 +329,7 @@ export function AnalyzeForm() {
         <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>空态</h2>
           <p style={{ margin: 0, lineHeight: 1.6 }}>
-            成功返回后，这里会显示 portrait summary、metrics、evidence、community
+            成功返回后，这里会显示当前单平台分析的 portrait summary、metrics、evidence、community
             breakdowns 和 warnings。
           </p>
         </section>
@@ -259,6 +340,14 @@ export function AnalyzeForm() {
           <section style={cardStyle}>
             <h2 style={sectionTitleStyle}>Portrait Summary</h2>
             <p style={{ marginTop: 0 }}>
+              <strong>Analyzed Platform:</strong>{' '}
+              {communityMeta[lastSubmitted?.community ?? community].title}
+            </p>
+            <p>
+              <strong>Submitted Handle:</strong>{' '}
+              {lastSubmitted?.handle ?? 'N/A'}
+            </p>
+            <p>
               <strong>Archetype:</strong>{' '}
               {result.portrait?.archetype ?? 'N/A'}
             </p>
