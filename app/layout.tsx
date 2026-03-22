@@ -12,7 +12,15 @@ type RootLayoutProps = Readonly<{
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="zh-CN">
-      <body>
+      <body
+        style={{
+          margin: 0,
+          fontFamily:
+            'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          background: '#f7f7f7',
+          color: '#111827',
+        }}
+      >
         {children}
       </body>
     </html>
