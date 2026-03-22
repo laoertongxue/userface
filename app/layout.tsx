@@ -1,10 +1,8 @@
 import type { Metadata } from 'next';
-import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Community Portrait Analysis',
-  description:
-    'A modular monolith for multi-community profile analysis with connector isolation and evidence-based portraits.',
+  title: '社区用户画像分析',
+  description: '第 1 阶段：V2EX 单平台最小闭环的应用入口与分析 API 骨架。',
 };
 
 type RootLayoutProps = Readonly<{
@@ -14,7 +12,9 @@ type RootLayoutProps = Readonly<{
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,47 +1,73 @@
 import { NextResponse } from 'next/server';
-import { ResolveIdentityCluster } from '@/src/contexts/identity-resolution/application/use-cases/ResolveIdentityCluster';
-import { FetchIdentityClusterSnapshots } from '@/src/contexts/source-acquisition/application/use-cases/FetchIdentityClusterSnapshots';
-import { StaticConnectorRegistry } from '@/src/contexts/source-acquisition/infrastructure/connectors/registry';
-import { BuildCanonicalActivityStream } from '@/src/contexts/activity-normalization/application/use-cases/BuildCanonicalActivityStream';
-import { AnalyzeIdentityCluster } from '@/src/contexts/portrait-analysis/application/use-cases/AnalyzeIdentityCluster';
-import { ComposePortraitReport } from '@/src/contexts/report-composition/application/use-cases/ComposePortraitReport';
+import { ZodError } from 'zod';
+import { runAnalyzePipeline } from '@/src/app-services/analyze/runAnalyzePipeline';
 import { analyzeRequestSchema } from '@/src/contexts/report-composition/interfaces/http/analyze.schema';
-import { platformPolicies } from '@/src/contexts/platform-governance/infrastructure/config/policies';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const parsed = analyzeRequestSchema.parse(body);
-    const identityCluster = new ResolveIdentityCluster().execute(parsed.identity);
-    const connectorRegistry = new StaticConnectorRegistry();
-    const snapshots = await new FetchIdentityClusterSnapshots(connectorRegistry).execute(
-      {
-        accounts: identityCluster.accounts,
-        options: parsed.options,
-      },
-      {
-        traceId: crypto.randomUUID(),
-        timeoutMs: platformPolicies.requestTimeoutMs,
-        locale: parsed.options?.locale ?? 'zh-CN',
-      },
-    );
-    const activityStream = new BuildCanonicalActivityStream().execute(snapshots);
-    const report = new AnalyzeIdentityCluster().execute({
-      identityCluster,
-      snapshots,
-      activityStream,
-    });
+  let body: unknown;
 
-    return NextResponse.json(new ComposePortraitReport().execute(report));
+  try {
+    body = await request.json();
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'Request validation failed',
+          details: {
+            formErrors: ['Request body must be valid JSON.'],
+            fieldErrors: {},
+          },
+        },
       },
       { status: 400 },
+    );
+  }
+
+  const parsed = analyzeRequestSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'Request validation failed',
+          details: parsed.error.flatten(),
+        },
+      },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const result = await runAnalyzePipeline(parsed.data);
+
+    return NextResponse.json(result, { status: 200 });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Request validation failed',
+            details: error.flatten(),
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Unexpected server error',
+        },
+      },
+      { status: 500 },
     );
   }
 }
