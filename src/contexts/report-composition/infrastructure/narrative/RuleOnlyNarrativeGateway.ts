@@ -4,6 +4,8 @@ import type { LlmNarrativeGateway } from '@/src/contexts/report-composition/doma
 import type { NarrativeDraft } from '@/src/contexts/report-composition/domain/entities/NarrativeDraft';
 import type { NarrativeSection } from '@/src/contexts/report-composition/domain/entities/NarrativeSection';
 import { normalizeWhitespace } from '@/src/shared/utils/text';
+import { metricNames } from '@/src/contexts/platform-governance/infrastructure/observability/MetricNames';
+import { observabilityEvents } from '@/src/contexts/platform-governance/infrastructure/observability/StructuredLogger';
 
 function humanizeArchetype(archetype: string): string {
   switch (archetype) {
@@ -72,6 +74,15 @@ function buildCaveatContent(input: ComposeNarrativeInput): string | null {
 
 export class RuleOnlyNarrativeGateway implements LlmNarrativeGateway {
   async generateNarrative(input: ComposeNarrativeInput): Promise<NarrativeGenerationResult> {
+    const observability = input.observability?.child('narrative.generate.rule_only');
+    const span = observability?.startSpan('narrative.generate.rule_only');
+    observability?.logger.event(observabilityEvents.narrativeGenerateStarted, {
+      message: 'Rule-only narrative generation started.',
+      context: {
+        provider: 'rule-only',
+        mode: input.mode,
+      },
+    });
     const sections: NarrativeSection[] = [
       {
         code: 'HEADLINE',
@@ -112,11 +123,34 @@ export class RuleOnlyNarrativeGateway implements LlmNarrativeGateway {
       },
     };
 
-    return {
+    const result = {
       draft,
       fallbackUsed: false,
       warnings: [],
-    };
+    } satisfies NarrativeGenerationResult;
+    const completedSpan = span?.finish('success');
+    observability?.logger.event(observabilityEvents.narrativeGenerateCompleted, {
+      message: 'Rule-only narrative generation completed.',
+      context: {
+        provider: 'rule-only',
+        mode: input.mode,
+        sectionCount: sections.length,
+        durationMs: completedSpan?.durationMs,
+      },
+    });
+    observability?.metrics.counter(metricNames.narrativeGenerateTotal, 1, {
+      provider: 'rule-only',
+      mode: input.mode,
+      outcome: 'success',
+    });
+    if (completedSpan) {
+      observability?.metrics.timing(metricNames.narrativeGenerateDurationMs, completedSpan.durationMs, {
+        provider: 'rule-only',
+        mode: input.mode,
+        outcome: 'success',
+      });
+    }
+
+    return result;
   }
 }
-

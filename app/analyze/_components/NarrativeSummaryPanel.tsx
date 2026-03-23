@@ -101,10 +101,11 @@ export function NarrativeSummaryPanel({
         <h2
           style={{
             marginTop: 0,
-            marginBottom: 10,
-            fontSize: 30,
-            lineHeight: 1.15,
-            letterSpacing: '-0.04em',
+            marginBottom: 12,
+            fontSize: 32,
+            lineHeight: 1.06,
+            letterSpacing: '-0.05em',
+            maxWidth: '18ch',
           }}
         >
           {headline}
@@ -114,36 +115,45 @@ export function NarrativeSummaryPanel({
       <p
         style={{
           marginTop: 0,
-          marginBottom: 16,
+          marginBottom: 18,
           fontSize: 16,
-          lineHeight: 1.8,
+          lineHeight: 1.82,
           color: 'var(--text-primary)',
+          maxWidth: '64ch',
         }}
       >
         {shortSummary}
       </p>
 
       {(topTags.length > 0 || result.portrait?.archetype || portraitConfidence !== undefined) && (
-        <div style={{ display: 'grid', gap: 14, marginBottom: 16 }}>
+        <div
+          style={{
+            display: 'grid',
+            gap: 14,
+            marginBottom: 16,
+            paddingTop: 16,
+            borderTop: '1px solid var(--border-soft)',
+          }}
+        >
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
               gap: 12,
             }}
           >
-            <div>
+            <div style={insetPanelStyle}>
               <div style={{ ...subSectionTitleStyle, marginBottom: 6 }}>Archetype</div>
-              <strong>{result.portrait?.archetype ?? 'N/A'}</strong>
+              <strong style={{ fontSize: 18 }}>{result.portrait?.archetype ?? 'N/A'}</strong>
             </div>
-            <div>
+            <div style={insetPanelStyle}>
               <div style={{ ...subSectionTitleStyle, marginBottom: 6 }}>Portrait Confidence</div>
-              <strong>{formatConfidence(portraitConfidence)}</strong>
+              <strong style={{ fontSize: 18 }}>{formatConfidence(portraitConfidence)}</strong>
             </div>
             {clusterConfidence !== undefined && mode === 'MANUAL_CLUSTER' && (
-              <div>
+              <div style={insetPanelStyle}>
                 <div style={{ ...subSectionTitleStyle, marginBottom: 6 }}>Cluster Confidence</div>
-                <strong>{formatConfidence(clusterConfidence)}</strong>
+                <strong style={{ fontSize: 18 }}>{formatConfidence(clusterConfidence)}</strong>
               </div>
             )}
           </div>

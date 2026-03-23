@@ -1,3 +1,5 @@
+import type { ObservabilityContext } from '@/src/contexts/platform-governance/infrastructure/observability/ObservabilityContext';
+
 export type CommunityId = 'v2ex' | 'guozaoke' | 'weibo';
 export type ConnectorMode = 'public' | 'oauth';
 export type ActivityType = 'topic' | 'reply';
@@ -35,6 +37,7 @@ export interface AcquisitionContext {
   traceId: string;
   timeoutMs: number;
   locale: 'zh-CN' | 'en-US';
+  observability?: ObservabilityContext;
   auth?: {
     bearerToken?: string;
     cookie?: string;

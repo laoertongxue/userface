@@ -8,6 +8,9 @@ import {
   ensureNarrativeGatewayError,
 } from '@/src/contexts/report-composition/infrastructure/narrative/NarrativeGatewayError';
 import { NarrativeResponseParser } from '@/src/contexts/report-composition/infrastructure/narrative/NarrativeResponseParser';
+import { metricNames } from '@/src/contexts/platform-governance/infrastructure/observability/MetricNames';
+import { normalizeErrorCode } from '@/src/contexts/platform-governance/infrastructure/observability/ErrorCodeCatalog';
+import { observabilityEvents } from '@/src/contexts/platform-governance/infrastructure/observability/StructuredLogger';
 
 type FetchLike = typeof fetch;
 
@@ -45,6 +48,9 @@ export class MiniMaxNarrativeGateway implements LlmNarrativeGateway {
   ) {}
 
   async generateNarrative(input: ComposeNarrativeInput): Promise<NarrativeGenerationResult> {
+    const observability = input.observability?.child('narrative.generate.minimax');
+    const span = observability?.startSpan('narrative.generate.minimax');
+
     if (!this.config.minimax.isConfigured) {
       throw NarrativeGatewayError.config(
         'MiniMax narrative provider requires API key, base URL, and model.',
@@ -56,6 +62,13 @@ export class MiniMaxNarrativeGateway implements LlmNarrativeGateway {
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
     try {
+      observability?.logger.event(observabilityEvents.narrativeGenerateStarted, {
+        message: 'MiniMax narrative generation started.',
+        context: {
+          provider: 'minimax',
+          mode: input.mode,
+        },
+      });
       const promptPayload = this.promptBuilder.build(input);
       const response = await this.fetchImpl(
         `${this.config.minimax.baseUrl}/chat/completions`,
@@ -92,13 +105,70 @@ export class MiniMaxNarrativeGateway implements LlmNarrativeGateway {
         );
       }
 
-      return {
+      const result = {
         draft: this.responseParser.parse(content, input),
         fallbackUsed: false,
         warnings: [],
-      };
+      } satisfies NarrativeGenerationResult;
+      const completedSpan = span?.finish('success');
+      observability?.logger.event(observabilityEvents.narrativeGenerateCompleted, {
+        message: 'MiniMax narrative generation completed.',
+        context: {
+          provider: 'minimax',
+          mode: input.mode,
+          sectionCount: result.draft?.sections.length ?? 0,
+          durationMs: completedSpan?.durationMs,
+        },
+      });
+      observability?.metrics.counter(metricNames.narrativeGenerateTotal, 1, {
+        provider: 'minimax',
+        mode: input.mode,
+        outcome: 'success',
+      });
+      if (completedSpan) {
+        observability?.metrics.timing(metricNames.narrativeGenerateDurationMs, completedSpan.durationMs, {
+          provider: 'minimax',
+          mode: input.mode,
+          outcome: 'success',
+        });
+      }
+
+      return result;
     } catch (error) {
-      throw ensureNarrativeGatewayError(error, 'minimax');
+      const gatewayError = ensureNarrativeGatewayError(error, 'minimax');
+      const failedSpan = span?.finish('failure');
+
+      observability?.logger.event(observabilityEvents.narrativeGenerateFailed, {
+        level: 'error',
+        message: 'MiniMax narrative generation failed.',
+        errorCode: normalizeErrorCode({ error: gatewayError }),
+        context: {
+          provider: 'minimax',
+          mode: input.mode,
+          durationMs: failedSpan?.durationMs,
+          gatewayCode: gatewayError.code,
+        },
+      });
+      observability?.metrics.counter(metricNames.narrativeGenerateTotal, 1, {
+        provider: 'minimax',
+        mode: input.mode,
+        outcome: 'failure',
+      });
+      if (failedSpan) {
+        observability?.metrics.timing(metricNames.narrativeGenerateDurationMs, failedSpan.durationMs, {
+          provider: 'minimax',
+          mode: input.mode,
+          outcome: 'failure',
+        });
+      }
+      if (gatewayError.code === 'INVALID_RESPONSE') {
+        observability?.metrics.counter(metricNames.narrativeInvalidResponseTotal, 1, {
+          provider: 'minimax',
+          mode: input.mode,
+        });
+      }
+
+      throw gatewayError;
     } finally {
       clearTimeout(timeout);
     }

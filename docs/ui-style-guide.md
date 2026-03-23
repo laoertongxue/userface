@@ -4,6 +4,8 @@
 
 This pass aligns the current product UI around one visual language before Stage 6.
 
+The target direction is a narrow-column, dark product canvas close to the reference style the project now follows: quiet, centered, warm-accented, and clearly layered.
+
 The scope is limited to:
 
 - homepage
@@ -21,10 +23,12 @@ The current UI follows these reference-derived principles:
 
 - deep dark background, near-black rather than neutral gray
 - centered narrow-column layout, even on desktop
+- desktop width should still feel mobile-first, not like a stretched dashboard
 - large-radius stacked cards instead of wide dashboard panels
 - orange / amber as the main accent
 - secondary information in muted gray, not colorful dashboards
 - narrative-first reading entry, but facts stay visible
+- hero first, then risk/caveat, then traits, then evidence, then metrics and coverage
 
 ## Visual Rules
 
@@ -60,6 +64,7 @@ The current UI follows these reference-derived principles:
 ### Layout
 
 - keep the page in a centered narrow shell
+- prefer a single visual axis over multi-column dashboards
 - use vertical stacking as the default rhythm
 - allow small grids only for:
   - metrics

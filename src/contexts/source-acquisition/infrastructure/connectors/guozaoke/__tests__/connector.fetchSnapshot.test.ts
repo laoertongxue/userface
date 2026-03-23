@@ -119,6 +119,59 @@ describe('GuozaokeConnector.fetchSnapshot', () => {
     ]);
   });
 
+  test('returns TOPICS_HIDDEN when later topic pages are not publicly visible', async () => {
+    const profileHtml = await readGuozaokeFixture('user-page.html');
+    const repliesHtml = await readGuozaokeFixture('replies-page-1.html');
+    const topicsPageOneHtml = await readGuozaokeFixture('topics-page-1.html');
+    const hiddenTopicsHtml = await readGuozaokeFixture('topics-page-hidden.html');
+
+    const snapshot = await createConnector({
+      fetchUserProfilePage: async () => ({
+        bodyText: profileHtml,
+        fetchedAt: guozaokeFetchedAt,
+        route: '/u/:id',
+        url: 'https://www.guozaoke.com/u/sample-user',
+      }),
+      fetchUserRepliesPage: async () => ({
+        bodyText: repliesHtml,
+        fetchedAt: guozaokeFetchedAt,
+        page: 1,
+        route: '/u/:id/replies',
+        url: 'https://www.guozaoke.com/u/sample-user/replies?p=1',
+      }),
+      fetchUserTopicsPage: async (_handle, page) => ({
+        bodyText: page === 1 ? topicsPageOneHtml : hiddenTopicsHtml,
+        fetchedAt: guozaokeFetchedAt,
+        page,
+        route: '/u/:id/topics',
+        url: `https://www.guozaoke.com/u/sample-user/topics?p=${page}`,
+      }),
+    }).fetchSnapshot(
+      {
+        ref: {
+          community: 'guozaoke',
+          handle: 'sample-user',
+        },
+        window: {
+          maxItems: 20,
+          maxPages: 3,
+        },
+        include: ['profile', 'replies', 'topics'],
+      },
+      baseGuozaokeContext,
+    );
+
+    expect(snapshot.activities.some((activity) => activity.type === 'topic')).toBe(true);
+    expect(snapshot.diagnostics.degraded).toBe(true);
+    expect(snapshot.warnings).toMatchObject([
+      expect.objectContaining({
+        code: 'TOPICS_HIDDEN',
+        message: 'Topics for Guozaoke user "sample-user" were not fully available or publicly visible.',
+      }),
+    ]);
+    expect(snapshot.warnings.some((warning) => warning.code === 'SELECTOR_CHANGED')).toBe(false);
+  });
+
   test('returns partial result when replies drift but topics succeed', async () => {
     const happyFetcher = await createHappyFetcher();
     const driftHtml = await readGuozaokeFixture('replies-selector-drift.html');

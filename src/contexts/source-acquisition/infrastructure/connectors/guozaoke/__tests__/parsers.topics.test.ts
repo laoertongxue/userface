@@ -49,4 +49,15 @@ describe('Guozaoke topics parser', () => {
       ),
     );
   });
+
+  test('throws TOPICS_HIDDEN when topics are not publicly visible on later pages', async () => {
+    const html = await readGuozaokeFixture('topics-page-hidden.html');
+
+    expect(() => parseTopicsPage(html)).toThrowError(
+      new GuozaokeParserError(
+        'TOPICS_HIDDEN',
+        'Guozaoke topics page indicates that additional topics were not publicly visible.',
+      ),
+    );
+  });
 });

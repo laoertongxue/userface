@@ -44,4 +44,11 @@ describe('parseTopicsPage', () => {
     expect(parsed.totalTopics).toBe(0);
     expect(parsed.totalPages).toBe(1);
   });
+
+  test('throws TOPICS_HIDDEN when the member hides their topics list', async () => {
+    const fixture = await readV2exFixture('topics-page-hidden.html');
+
+    expect(() => parseTopicsPage(fixture)).toThrowError(V2exParserError);
+    expect(() => parseTopicsPage(fixture)).toThrow(/hidden their topics list/i);
+  });
 });

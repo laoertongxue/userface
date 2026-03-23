@@ -10,6 +10,9 @@ import {
 } from '@/src/contexts/report-composition/infrastructure/narrative/NarrativeGatewayError';
 import { MiniMaxNarrativeGateway } from '@/src/contexts/report-composition/infrastructure/narrative/MiniMaxNarrativeGateway';
 import { RuleOnlyNarrativeGateway } from '@/src/contexts/report-composition/infrastructure/narrative/RuleOnlyNarrativeGateway';
+import { metricNames } from '@/src/contexts/platform-governance/infrastructure/observability/MetricNames';
+import { normalizeErrorCode } from '@/src/contexts/platform-governance/infrastructure/observability/ErrorCodeCatalog';
+import { observabilityEvents } from '@/src/contexts/platform-governance/infrastructure/observability/StructuredLogger';
 
 type FetchLike = typeof fetch;
 
@@ -22,6 +25,7 @@ export class FallbackNarrativeGateway implements LlmNarrativeGateway {
   ) {}
 
   async generateNarrative(input: ComposeNarrativeInput): Promise<NarrativeGenerationResult> {
+    const observability = input.observability?.child('narrative.fallback');
     const useRuleSummary =
       input.fallbackPolicy.mode === 'USE_RULE_SUMMARY' && input.fallbackPolicy.allowRuleSummary;
 
@@ -30,7 +34,7 @@ export class FallbackNarrativeGateway implements LlmNarrativeGateway {
         ? await this.ruleOnlyGateway.generateNarrative(input)
         : await this.disabledGateway.generateNarrative(input);
 
-      return {
+      const result = {
         ...fallbackResult,
         fallbackUsed: true,
         fallbackMode: input.fallbackPolicy.mode,
@@ -40,7 +44,25 @@ export class FallbackNarrativeGateway implements LlmNarrativeGateway {
             ? [this.fallbackWarning]
             : []),
         ],
-      };
+      } satisfies NarrativeGenerationResult;
+      observability?.logger.event(observabilityEvents.narrativeFallbackUsed, {
+        level: 'warn',
+        message: 'Narrative generation used fallback because the primary provider was unavailable.',
+        errorCode: normalizeErrorCode({ fallbackUsed: true }),
+        context: {
+          mode: input.mode,
+          fallbackMode: input.fallbackPolicy.mode,
+          provider: 'none',
+          generatedBy: result.draft?.generatedBy ?? 'NONE',
+        },
+      });
+      observability?.metrics.counter(metricNames.narrativeFallbackTotal, 1, {
+        mode: input.mode,
+        provider: 'none',
+        fallbackMode: input.fallbackPolicy.mode,
+      });
+
+      return result;
     }
 
     try {
@@ -51,7 +73,7 @@ export class FallbackNarrativeGateway implements LlmNarrativeGateway {
         ? await this.ruleOnlyGateway.generateNarrative(input)
         : await this.disabledGateway.generateNarrative(input);
 
-      return {
+      const result = {
         ...fallbackResult,
         fallbackUsed: true,
         fallbackMode: input.fallbackPolicy.mode,
@@ -61,7 +83,26 @@ export class FallbackNarrativeGateway implements LlmNarrativeGateway {
             ? [`fallback:${gatewayError.code.toLowerCase()}`]
             : []),
         ],
-      };
+      } satisfies NarrativeGenerationResult;
+      observability?.logger.event(observabilityEvents.narrativeFallbackUsed, {
+        level: 'warn',
+        message: 'Narrative generation fell back after primary provider failure.',
+        errorCode: normalizeErrorCode({ fallbackUsed: true }),
+        context: {
+          mode: input.mode,
+          fallbackMode: input.fallbackPolicy.mode,
+          provider: gatewayError.provider ?? 'minimax',
+          gatewayCode: gatewayError.code,
+          generatedBy: result.draft?.generatedBy ?? 'NONE',
+        },
+      });
+      observability?.metrics.counter(metricNames.narrativeFallbackTotal, 1, {
+        mode: input.mode,
+        provider: gatewayError.provider ?? 'minimax',
+        fallbackMode: input.fallbackPolicy.mode,
+      });
+
+      return result;
     }
   }
 }
@@ -121,4 +162,3 @@ export class NarrativeGatewayResolver {
     );
   }
 }
-

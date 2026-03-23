@@ -4,7 +4,9 @@ export const pageSectionGap = 22;
 
 export const panelStyle: CSSProperties = {
   padding: 'var(--card-padding)',
-  border: '1px solid var(--border-soft)',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'var(--border-soft)',
   borderRadius: 'var(--radius-card)',
   background: 'var(--surface-card)',
   boxShadow: 'var(--shadow-soft)',
@@ -19,7 +21,9 @@ export const emphasizedPanelStyle: CSSProperties = {
 
 export const insetPanelStyle: CSSProperties = {
   padding: 18,
-  border: '1px solid var(--border-soft)',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'var(--border-soft)',
   borderRadius: 'var(--radius-lg)',
   background: 'var(--surface-muted)',
 };
@@ -82,7 +86,9 @@ export const pillBaseStyle: CSSProperties = {
   gap: 6,
   padding: '6px 12px',
   borderRadius: 'var(--radius-pill)',
-  border: '1px solid var(--border-soft)',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'var(--border-soft)',
   background: 'var(--surface-pill)',
   fontSize: 12,
   lineHeight: 1.4,
@@ -106,7 +112,9 @@ export const metricCardStyle: CSSProperties = {
   padding: 16,
   borderRadius: 'var(--radius-lg)',
   background: 'var(--surface-muted)',
-  border: '1px solid var(--border-soft)',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'var(--border-soft)',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
 };
 
@@ -122,7 +130,9 @@ export function buttonStyle(
     minHeight: 44,
     padding: '11px 16px',
     borderRadius: 'var(--radius-control)',
-    border: '1px solid transparent',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'transparent',
     fontWeight: 600,
     lineHeight: 1,
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -162,7 +172,9 @@ export const inputStyle: CSSProperties = {
   minHeight: 46,
   padding: '12px 14px',
   borderRadius: 'var(--radius-control)',
-  border: '1px solid var(--border-soft)',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'var(--border-soft)',
   background: 'var(--surface-elevated)',
   color: 'var(--text-primary)',
   fontSize: 15,
@@ -200,7 +212,9 @@ export function itemCardStyle(tone: 'default' | 'accent' | 'warning' = 'default'
   const style: CSSProperties = {
     padding: 16,
     borderRadius: 'var(--radius-lg)',
-    border: '1px solid var(--border-soft)',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'var(--border-soft)',
     background: 'var(--surface-muted)',
   };
 

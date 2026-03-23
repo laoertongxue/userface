@@ -119,6 +119,12 @@ function isMemberNotFoundDocument(html: string): boolean {
   return title.includes('会员未找到') || normalizeWhitespace($('.header').first().text()).includes('会员未找到');
 }
 
+function isTopicsHiddenDocument(html: string): boolean {
+  const $ = load(html);
+  const mainText = normalizeWhitespace($('#Main .box').first().text());
+  return mainText.includes('主题列表被隐藏');
+}
+
 function extractReplyContent(containerHtml: string): string {
   return normalizeWhitespace(
     containerHtml
@@ -241,6 +247,13 @@ export function parseRepliesPage(html: string): ParsedV2exRepliesPage {
 export function parseTopicsPage(html: string): ParsedV2exTopicsPage {
   if (isMemberNotFoundDocument(html)) {
     throw new V2exParserError('NOT_FOUND', 'V2EX topics page indicates that the member was not found.');
+  }
+
+  if (isTopicsHiddenDocument(html)) {
+    throw new V2exParserError(
+      'TOPICS_HIDDEN',
+      'V2EX topics page indicates that the member has hidden their topics list.',
+    );
   }
 
   const $ = load(html);

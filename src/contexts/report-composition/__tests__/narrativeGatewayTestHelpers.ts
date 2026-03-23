@@ -81,6 +81,6 @@ export function makeComposeNarrativeInput(
     tone: overrides.tone ?? 'ANALYTICAL',
     audience: overrides.audience ?? 'INTERNAL_QA',
     fallbackPolicy: overrides.fallbackPolicy ?? makeNarrativeFallbackPolicy(),
+    observability: overrides.observability,
   };
 }
-

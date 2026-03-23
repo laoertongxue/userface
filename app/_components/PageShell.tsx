@@ -26,6 +26,14 @@ export function PageShell({
   return (
     <main className={`page-shell${wide ? ' page-shell--wide' : ''}`} style={shellStyle}>
       <div className="page-stack">
+        <div className="page-chrome">
+          <div className="page-brand-badge">
+            <span>Community Portrait</span>
+            <strong>Studio</strong>
+          </div>
+          <p className="page-brand-meta">Narrative-first, fact-grounded</p>
+        </div>
+
         {backHref && (
           <a href={backHref} className="page-back-link">
             ← {backLabel}

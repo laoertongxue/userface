@@ -109,6 +109,14 @@ export function SuggestionPanel({
         </button>
       </div>
 
+      <div style={{ ...insetPanelStyle, marginTop: 18 }}>
+        <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Review Rule</p>
+        <p style={mutedTextStyle}>
+          这里只帮助你确认“哪些账号看起来可能属于同一主体”。接受或拒绝只改变本地草稿的审阅状态；真正提交到
+          <code>/api/analyze</code> 的仍然只是当前 accounts 列表。
+        </p>
+      </div>
+
       {error && (
         <div style={{ ...errorPanelStyle, marginTop: 18 }}>
           <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Suggestion Error</p>

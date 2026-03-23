@@ -167,6 +167,13 @@ function toRepliesWarning(error: unknown, handle: string): ConnectorWarning {
 
 function toTopicsWarning(error: unknown, handle: string): ConnectorWarning {
   if (error instanceof GuozaokeParserError) {
+    if (error.code === 'TOPICS_HIDDEN') {
+      return buildWarning(
+        'TOPICS_HIDDEN',
+        `Topics for Guozaoke user "${handle}" were not fully available or publicly visible.`,
+      );
+    }
+
     if (error.code === 'SELECTOR_CHANGED') {
       return buildWarning(
         'SELECTOR_CHANGED',

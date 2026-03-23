@@ -1,7 +1,7 @@
 import { load } from 'cheerio';
 import { normalizeWhitespace } from '@/src/shared/utils/text';
 
-export type GuozaokeParserErrorCode = 'NOT_FOUND' | 'SELECTOR_CHANGED';
+export type GuozaokeParserErrorCode = 'NOT_FOUND' | 'SELECTOR_CHANGED' | 'TOPICS_HIDDEN';
 
 export class GuozaokeParserError extends Error {
   constructor(
@@ -147,6 +147,25 @@ function isExplicitlyEmptyTopicsPage(html: string): boolean {
     '没有主题',
     '主题列表为空',
   ]);
+}
+
+function isUnavailableTopicsPage(html: string): boolean {
+  const $ = load(html);
+  const topicsRoot = $('.user-topics, .topic-lists').first();
+  const topicsContent = topicsRoot.find('.ui-content').first();
+  const topicItems = topicsRoot.find('.topic-item');
+  const totalTopics = parseStatusCount(html, '.status-topic');
+  const pageText = normalizeWhitespace(topicsContent.text());
+
+  if (!topicsRoot.length || topicItems.length > 0) {
+    return false;
+  }
+
+  if (containsAnyText(pageText, ['仅自己可见', '需要登录', '暂无权限', '无权限查看', '不可见'])) {
+    return true;
+  }
+
+  return Boolean(topicsContent.length && !pageText && totalTopics && totalTopics > 0);
 }
 
 function collectProfileFields(html: string): Record<string, ParsedField> {
@@ -323,6 +342,13 @@ export function parseRepliesPage(html: string): ParsedGuozaokeRepliesPage {
 export function parseTopicsPage(html: string): ParsedGuozaokeTopicsPage {
   if (isNotFoundDocument(html)) {
     throw new GuozaokeParserError('NOT_FOUND', 'Guozaoke topics page indicates that the user was not found.');
+  }
+
+  if (isUnavailableTopicsPage(html)) {
+    throw new GuozaokeParserError(
+      'TOPICS_HIDDEN',
+      'Guozaoke topics page indicates that additional topics were not publicly visible.',
+    );
   }
 
   const $ = load(html);

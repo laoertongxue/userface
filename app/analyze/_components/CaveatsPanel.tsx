@@ -2,6 +2,7 @@ import React from 'react';
 import type { AnalyzeResponse } from '@/app/analyze/types';
 import {
   cautionPanelStyle,
+  itemCardStyle,
   listStyle,
   sectionTitleStyle,
 } from '@/app/analyze/_components/resultUi';
@@ -52,13 +53,15 @@ export function CaveatsPanel({ result }: CaveatsPanelProps) {
     <section style={cautionPanelStyle}>
       <h2 style={sectionTitleStyle}>Caveats & Warnings</h2>
       {explicitCaveat && (
-        <p style={{ marginTop: 0, lineHeight: 1.8, color: 'var(--text-primary)' }}>
-          <strong>Caveat:</strong> {explicitCaveat}
-        </p>
+        <div style={{ ...itemCardStyle('warning'), marginBottom: warnings.length > 0 || narrativeWarnings.length > 0 ? 14 : 0 }}>
+          <p style={{ margin: 0, lineHeight: 1.8, color: 'var(--text-primary)' }}>
+            <strong>Caveat:</strong> {explicitCaveat}
+          </p>
+        </div>
       )}
 
       {!explicitCaveat && fallbackCaveats.length > 0 && (
-        <div style={{ marginTop: 0 }}>
+        <div style={{ ...itemCardStyle('warning'), marginTop: 0 }}>
           <strong>保守提示</strong>
           <ul style={{ ...listStyle, marginTop: 8 }}>
             {fallbackCaveats.map((item) => (

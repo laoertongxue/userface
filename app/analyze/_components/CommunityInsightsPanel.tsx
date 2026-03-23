@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AnalyzeResponse } from '@/app/analyze/types';
 import {
+  insetPanelStyle,
   itemCardStyle,
   metricGridStyle,
   mutedTextStyle,
@@ -61,10 +62,7 @@ export function CommunityInsightsPanel({ result }: CommunityInsightsPanelProps) 
                   <div style={{ ...mutedTextStyle }}>当前没有可展示的 metrics。</div>
                 ) : (
                   Object.entries(item.metrics ?? {}).map(([key, value]) => (
-                    <div
-                      key={key}
-                      style={itemCardStyle()}
-                    >
+                    <div key={key} style={insetPanelStyle}>
                       <div style={{ ...mutedTextStyle, fontSize: 13 }}>{key}</div>
                       <strong>{value}</strong>
                     </div>

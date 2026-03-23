@@ -173,6 +173,32 @@ describe('V2exConnector.fetchSnapshot', () => {
     ]);
   });
 
+  test('surfaces TOPICS_HIDDEN when the member hides their topics list', async () => {
+    const happyFetcher = await createHappyFetcher();
+    const hiddenHtml = await readV2exFixture('topics-page-hidden.html');
+    const snapshot = await fetchSnapshotWith({
+      ...happyFetcher,
+      fetchMemberTopicsPage: async () => ({
+        bodyText: hiddenHtml,
+        fetchedAt: '2026-03-22T10:00:00.000Z',
+        page: 1,
+        route: '/member/:username/topics',
+        url: 'https://www.v2ex.com/member/laoertongzhi/topics?p=1',
+      }),
+    });
+
+    expect(snapshot.profile?.handle).toBe('Livid');
+    expect(snapshot.activities.some((activity) => activity.type === 'reply')).toBe(true);
+    expect(snapshot.activities.some((activity) => activity.type === 'topic')).toBe(false);
+    expect(snapshot.diagnostics.degraded).toBe(true);
+    expect(snapshot.warnings).toMatchObject([
+      expect.objectContaining({
+        code: 'TOPICS_HIDDEN',
+      }),
+    ]);
+    expect(snapshot.warnings.some((warning) => warning.code === 'SELECTOR_CHANGED')).toBe(false);
+  });
+
   test('keeps profile success with zero activities without marking degraded when both pages are empty', async () => {
     const profile = JSON.parse(await readV2exFixture('member-found.json'));
     const emptyRepliesHtml = await readV2exFixture('replies-page-empty.html');

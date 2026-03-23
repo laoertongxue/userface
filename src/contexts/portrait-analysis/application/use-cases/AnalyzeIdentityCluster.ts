@@ -15,6 +15,8 @@ import { EvidenceSelectionService } from '@/src/contexts/portrait-analysis/domai
 import { FeatureExtractionService } from '@/src/contexts/portrait-analysis/domain/services/FeatureExtractionService';
 import { SignalDerivationService } from '@/src/contexts/portrait-analysis/domain/services/SignalDerivationService';
 import { TagCompositionService } from '@/src/contexts/portrait-analysis/domain/services/TagCompositionService';
+import { metricNames } from '@/src/contexts/platform-governance/infrastructure/observability/MetricNames';
+import { observabilityEvents } from '@/src/contexts/platform-governance/infrastructure/observability/StructuredLogger';
 
 export class AnalyzeIdentityCluster {
   private readonly activityDeduplicationService: ActivityDeduplicationService;
@@ -78,9 +80,34 @@ export class AnalyzeIdentityCluster {
   }
 
   execute(input: AnalyzePortraitInput): BaselinePortraitAnalysis {
+    const observability = input.observability?.child('cluster.analysis');
+    const span = observability?.startSpan('cluster.analysis');
+    observability?.logger.event(observabilityEvents.clusterAnalysisStarted, {
+      message: 'Portrait analysis started for identity cluster.',
+      context: {
+        accountCount: input.identityCluster.accounts.length,
+        mode: input.identityCluster.mode,
+      },
+    });
+
     const clusterMergeResult = this.buildClusterMergeResult(input);
     const deduplicationResult = this.activityDeduplicationService.dedupe(
       clusterMergeResult.mergedActivities,
+    );
+    observability?.logger.event(observabilityEvents.clusterActivitiesDeduped, {
+      message: 'Cluster activities were deduplicated.',
+      context: {
+        mergedActivities: clusterMergeResult.mergedActivities.length,
+        dedupedActivities: deduplicationResult.dedupedActivities.length,
+        removedCount: deduplicationResult.removedCount,
+      },
+    });
+    observability?.metrics.counter(
+      metricNames.clusterActivitiesDedupedTotal,
+      deduplicationResult.removedCount,
+      {
+        outcome: deduplicationResult.removedCount > 0 ? 'partial' : 'success',
+      },
     );
     const activityStream = input.activityStream ?? {
       activities: deduplicationResult.dedupedActivities,
@@ -130,13 +157,30 @@ export class AnalyzeIdentityCluster {
       stableTraits: communitySynthesis.stableTraits,
       communityInsights: communitySynthesis.communityInsights,
     };
-
-    return this.engine.execute({
+    const result = this.engine.execute({
       portraitInput: normalizedInput,
       featureVector,
       evidenceSelection,
       confidenceProfile,
       ruleEvaluation,
     });
+
+    const completedSpan = span?.finish(
+      input.fetchResult?.failedCount || clusterMergeResult.degraded ? 'partial' : 'success',
+    );
+    observability?.logger.event(observabilityEvents.clusterAnalysisCompleted, {
+      message: 'Portrait analysis completed for identity cluster.',
+      context: {
+        totalActivities: result.featureVector.activity.totalActivities,
+        activeCommunities: Object.keys(result.featureVector.community.perCommunityMetrics).length,
+        degraded: result.featureVector.dataQuality.degraded || clusterMergeResult.degraded,
+        durationMs: completedSpan?.durationMs,
+      },
+    });
+    observability?.metrics.counter(metricNames.clusterAnalysisTotal, 1, {
+      outcome: input.fetchResult?.failedCount || clusterMergeResult.degraded ? 'partial' : 'success',
+    });
+
+    return result;
   }
 }

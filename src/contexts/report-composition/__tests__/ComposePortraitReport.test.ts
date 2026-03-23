@@ -16,6 +16,10 @@ import {
 } from '@/src/contexts/portrait-analysis/__tests__/ruleTestHelpers';
 import type { ComposeNarrativeInput } from '@/src/contexts/report-composition/application/dto/ComposeNarrativeInput';
 import type { NarrativeGenerationResult } from '@/src/contexts/report-composition/application/dto/NarrativeGenerationResult';
+import {
+  createTestObservabilityContext,
+  MemoryObservabilitySink,
+} from '@/src/contexts/platform-governance/__tests__/observabilityTestHelpers';
 
 class StaticNarrativeGateway implements LlmNarrativeGateway {
   constructor(private readonly result: NarrativeGenerationResult) {}
@@ -160,6 +164,7 @@ function makeInput(overrides: Partial<ComposePortraitReportInput> = {}): Compose
       ],
     warnings: overrides.warnings ?? [],
     narrative: overrides.narrative,
+    observability: overrides.observability,
   };
 }
 
@@ -302,6 +307,42 @@ describe('ComposePortraitReport narrative integration', () => {
     });
     expect(report.narrative?.warnings).toEqual(
       expect.arrayContaining(['fallback:upstream_error']),
+    );
+  });
+
+  test('records report compose observability while keeping the external report shape unchanged', async () => {
+    const sink = new MemoryObservabilitySink();
+    const report = await new ComposePortraitReport(
+      undefined,
+      undefined,
+      makeResolver(new RuleOnlyNarrativeGateway()),
+    ).execute(
+      makeInput({
+        narrative: {
+          mode: 'RULE_ONLY',
+        },
+        observability: createTestObservabilityContext(sink, {
+          route: '/api/analyze',
+          operation: 'report.compose',
+        }),
+      }),
+    );
+
+    expect(report.portrait.summary).toBeTruthy();
+    expect(report.narrative).toMatchObject({
+      generatedBy: 'RULE_ONLY',
+    });
+    expect(sink.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ event: 'report.compose.started' }),
+        expect.objectContaining({ event: 'report.compose.completed' }),
+      ]),
+    );
+    expect(sink.metrics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'report.compose_total' }),
+        expect.objectContaining({ name: 'report.compose_duration_ms' }),
+      ]),
     );
   });
 

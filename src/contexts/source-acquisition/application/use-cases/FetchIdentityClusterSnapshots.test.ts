@@ -11,6 +11,10 @@ import type {
 import type { CommunityConnector } from '@/src/contexts/source-acquisition/domain/contracts/CommunityConnector';
 import type { ConnectorRegistry } from '@/src/contexts/source-acquisition/domain/contracts/ConnectorRegistry';
 import { AcquisitionError } from '@/src/contexts/source-acquisition/infrastructure/errors/AcquisitionError';
+import {
+  createTestObservabilityContext,
+  MemoryObservabilitySink,
+} from '@/src/contexts/platform-governance/__tests__/observabilityTestHelpers';
 
 function buildSnapshot(
   ref: ExternalAccountRef,
@@ -221,6 +225,66 @@ describe('FetchIdentityClusterSnapshots', () => {
         code: 'RATE_LIMITED',
       }),
     ]);
+  });
+
+  test('records connector fetch and cluster partial-success observability events without changing behavior', async () => {
+    const cluster = createIdentityCluster({
+      accounts: [
+        { community: 'v2ex', handle: 'alpha' },
+        { community: 'guozaoke', handle: 'beta' },
+      ],
+      links: [
+        {
+          from: { community: 'v2ex', handle: 'alpha' },
+          to: { community: 'guozaoke', handle: 'beta' },
+          source: 'USER_ASSERTED',
+        },
+      ],
+      mode: 'MANUAL_CLUSTER',
+      now: '2026-03-22T00:00:00.000Z',
+    });
+    const sink = new MemoryObservabilitySink();
+
+    const registry = new FakeRegistry({
+      v2ex: new FakeConnector('v2ex', async ({ ref }) => buildSnapshot(ref)),
+      guozaoke: new FakeConnector('guozaoke', async () => {
+        throw AcquisitionError.fromStatus(429, 'https://www.guozaoke.com/u/beta');
+      }),
+      weibo: new FakeConnector('weibo', async ({ ref }) => buildSnapshot(ref)),
+    });
+
+    const result = await new FetchIdentityClusterSnapshots(registry).execute(
+      {
+        identityCluster: cluster,
+      },
+      {
+        ...acquisitionContext,
+        observability: createTestObservabilityContext(sink, {
+          route: '/api/analyze',
+          operation: 'connector.fetch',
+        }),
+      },
+    );
+
+    expect(result.successfulCount).toBe(1);
+    expect(result.failedCount).toBe(1);
+    expect(sink.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ event: 'connector.fetch.started' }),
+        expect.objectContaining({ event: 'connector.fetch.completed' }),
+        expect.objectContaining({ event: 'connector.fetch.failed' }),
+        expect.objectContaining({
+          event: 'cluster.analysis.partial_success',
+          errorCode: 'CLUSTER_PARTIAL_SUCCESS',
+        }),
+      ]),
+    );
+    expect(sink.metrics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'connector.fetch_total' }),
+        expect.objectContaining({ name: 'cluster.partial_success_total' }),
+      ]),
+    );
   });
 
   test('returns explicit all-failed state without throwing', async () => {

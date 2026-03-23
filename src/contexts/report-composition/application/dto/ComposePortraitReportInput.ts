@@ -14,6 +14,7 @@ import type { NarrativeFallbackPolicy } from '@/src/contexts/report-composition/
 import type { NarrativeAudience } from '@/src/contexts/report-composition/domain/value-objects/NarrativeAudience';
 import type { NarrativeMode } from '@/src/contexts/report-composition/domain/value-objects/NarrativeMode';
 import type { NarrativeTone } from '@/src/contexts/report-composition/domain/value-objects/NarrativeTone';
+import type { ObservabilityContext } from '@/src/contexts/platform-governance/infrastructure/observability/ObservabilityContext';
 
 export type ComposePortraitReportNarrativeOptions = {
   mode: NarrativeMode;
@@ -37,4 +38,5 @@ export type ComposePortraitReportInput = {
   clusterMergeResult?: ClusterMergeResult;
   fetchResult?: FetchIdentityClusterSnapshotsResult;
   narrative?: Partial<ComposePortraitReportNarrativeOptions>;
+  observability?: ObservabilityContext;
 };

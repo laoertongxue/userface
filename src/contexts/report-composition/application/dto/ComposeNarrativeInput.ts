@@ -13,6 +13,7 @@ import type { Signal } from '@/src/contexts/portrait-analysis/domain/entities/Si
 import type { NarrativeAudience } from '@/src/contexts/report-composition/domain/value-objects/NarrativeAudience';
 import type { NarrativeMode } from '@/src/contexts/report-composition/domain/value-objects/NarrativeMode';
 import type { NarrativeTone } from '@/src/contexts/report-composition/domain/value-objects/NarrativeTone';
+import type { ObservabilityContext } from '@/src/contexts/platform-governance/infrastructure/observability/ObservabilityContext';
 
 export type ComposeNarrativeInput = {
   portrait: Pick<Portrait, 'archetype' | 'tags' | 'summary' | 'confidence'>;
@@ -30,5 +31,5 @@ export type ComposeNarrativeInput = {
   tone: NarrativeTone;
   audience: NarrativeAudience;
   fallbackPolicy: NarrativeFallbackPolicy;
+  observability?: ObservabilityContext;
 };
-
