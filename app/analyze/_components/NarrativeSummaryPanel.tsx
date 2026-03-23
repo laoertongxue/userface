@@ -1,10 +1,8 @@
 import React, { type CSSProperties } from 'react';
 import type { AnalyzeMode, AnalyzeResponse, DraftAccount } from '@/app/analyze/types';
 import {
-  emphasizedPanelStyle,
   formatConfidence,
   insetPanelStyle,
-  mutedTextStyle,
   pillBaseStyle,
   subSectionTitleStyle,
 } from '@/app/analyze/_components/resultUi';
@@ -66,9 +64,18 @@ export function NarrativeSummaryPanel({
   const caveatTeaser = result.narrative?.caveats;
   const lowData = isLowData(result);
   const degraded = hasDegradedSignal(result);
+  const summaryCardStyle: CSSProperties = {
+    padding: '30px 28px',
+    borderRadius: 30,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background:
+      'radial-gradient(circle at 100% 0%, rgba(242,162,90,0.08), transparent 22%), linear-gradient(180deg, #191919 0%, #111111 100%)',
+    boxShadow: '0 18px 40px rgba(0,0,0,0.2)',
+    color: '#f6f2ea',
+  };
 
   return (
-    <section style={emphasizedPanelStyle}>
+    <section style={summaryCardStyle}>
       <div
         style={{
           display: 'flex',
@@ -102,10 +109,11 @@ export function NarrativeSummaryPanel({
           style={{
             marginTop: 0,
             marginBottom: 12,
-            fontSize: 32,
-            lineHeight: 1.06,
-            letterSpacing: '-0.05em',
-            maxWidth: '18ch',
+            fontSize: 40,
+            lineHeight: 1.02,
+            letterSpacing: '-0.065em',
+            maxWidth: '16ch',
+            color: '#f6f2ea',
           }}
         >
           {headline}
@@ -117,9 +125,9 @@ export function NarrativeSummaryPanel({
           marginTop: 0,
           marginBottom: 18,
           fontSize: 16,
-          lineHeight: 1.82,
-          color: 'var(--text-primary)',
-          maxWidth: '64ch',
+          lineHeight: 1.84,
+          color: 'rgba(246,242,234,0.88)',
+          maxWidth: '62ch',
         }}
       >
         {shortSummary}
@@ -132,7 +140,7 @@ export function NarrativeSummaryPanel({
             gap: 14,
             marginBottom: 16,
             paddingTop: 16,
-            borderTop: '1px solid var(--border-soft)',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
           }}
         >
           <div
@@ -143,17 +151,17 @@ export function NarrativeSummaryPanel({
             }}
           >
             <div style={insetPanelStyle}>
-              <div style={{ ...subSectionTitleStyle, marginBottom: 6 }}>Archetype</div>
-              <strong style={{ fontSize: 18 }}>{result.portrait?.archetype ?? 'N/A'}</strong>
+              <div style={{ ...subSectionTitleStyle, marginBottom: 6, color: '#8d867f' }}>Archetype</div>
+              <strong style={{ fontSize: 18, color: '#111111' }}>{result.portrait?.archetype ?? 'N/A'}</strong>
             </div>
             <div style={insetPanelStyle}>
-              <div style={{ ...subSectionTitleStyle, marginBottom: 6 }}>Portrait Confidence</div>
-              <strong style={{ fontSize: 18 }}>{formatConfidence(portraitConfidence)}</strong>
+              <div style={{ ...subSectionTitleStyle, marginBottom: 6, color: '#8d867f' }}>Portrait Confidence</div>
+              <strong style={{ fontSize: 18, color: '#111111' }}>{formatConfidence(portraitConfidence)}</strong>
             </div>
             {clusterConfidence !== undefined && mode === 'MANUAL_CLUSTER' && (
               <div style={insetPanelStyle}>
-                <div style={{ ...subSectionTitleStyle, marginBottom: 6 }}>Cluster Confidence</div>
-                <strong style={{ fontSize: 18 }}>{formatConfidence(clusterConfidence)}</strong>
+                <div style={{ ...subSectionTitleStyle, marginBottom: 6, color: '#8d867f' }}>Cluster Confidence</div>
+                <strong style={{ fontSize: 18, color: '#111111' }}>{formatConfidence(clusterConfidence)}</strong>
               </div>
             )}
           </div>
@@ -169,7 +177,7 @@ export function NarrativeSummaryPanel({
         </div>
       )}
 
-      <p style={{ ...mutedTextStyle, fontSize: 14 }}>
+      <p style={{ margin: 0, fontSize: 14, color: 'rgba(246,242,234,0.62)', lineHeight: 1.7 }}>
         提交账号：{' '}
         {submittedAccounts.map((account) => `${account.community}:${account.handle}`).join('，') || 'N/A'}
       </p>
@@ -179,10 +187,9 @@ export function NarrativeSummaryPanel({
           style={{
             ...insetPanelStyle,
             marginTop: 14,
-            borderColor: 'rgba(255, 153, 60, 0.28)',
-            background:
-              'linear-gradient(180deg, rgba(255,153,60,0.12) 0%, rgba(31,20,15,0.9) 100%)',
-            color: 'var(--text-secondary)',
+            borderColor: 'rgba(242,162,90,0.22)',
+            background: 'rgba(255,255,255,0.06)',
+            color: 'rgba(246,242,234,0.8)',
             lineHeight: 1.75,
           }}
         >
@@ -192,10 +199,12 @@ export function NarrativeSummaryPanel({
 
       {deepSummary && deepSummary !== shortSummary && (
         <details style={{ marginTop: 16 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#f6f2ea' }}>
             查看详细叙事摘要
           </summary>
-          <p style={{ marginTop: 12, marginBottom: 0, lineHeight: 1.8 }}>{deepSummary}</p>
+          <p style={{ marginTop: 12, marginBottom: 0, lineHeight: 1.8, color: 'rgba(246,242,234,0.84)' }}>
+            {deepSummary}
+          </p>
         </details>
       )}
     </section>

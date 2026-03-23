@@ -392,37 +392,29 @@ export function AnalyzeForm() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 22 }}>
-      <section style={emphasizedPanelStyle}>
-        <p style={subSectionTitleStyle}>Mode Switch</p>
-        <h2 style={sectionTitleStyle}>分析模式</h2>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-          {(['SINGLE_ACCOUNT', 'MANUAL_CLUSTER'] as AnalyzeMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => handleModeChange(mode)}
-              style={segmentedButtonStyle(draft.mode === mode, isBusy)}
-            >
-              {mode === 'SINGLE_ACCOUNT' ? '单账号分析' : '手工聚合分析'}
-            </button>
-          ))}
-        </div>
-        <p style={mutedTextStyle}>
-          单账号模式适合直接查看一个公开账号的画像。手工聚合模式则把多个账号草稿当作一个
-          本地 cluster，支持 suggestion 审阅、聚合分析和 cluster-aware 结果阅读。
-        </p>
-      </section>
+    <div style={{ display: 'grid', gap: 24 }}>
+      <div
+        style={{
+          display: 'grid',
+          gap: 22,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          alignItems: 'start',
+        }}
+      >
+        <section style={panelStyle}>
+          <p style={subSectionTitleStyle}>
+            {draft.mode === 'SINGLE_ACCOUNT' ? 'Single Account Input' : 'Manual Cluster Builder'}
+          </p>
+          <h2 style={sectionTitleStyle}>
+            {draft.mode === 'SINGLE_ACCOUNT' ? '输入一个账号开始分析' : '配置一个本地聚合分析主体'}
+          </h2>
+          <p style={{ ...mutedTextStyle, marginBottom: 18 }}>
+            {draft.mode === 'SINGLE_ACCOUNT'
+              ? '直接输入公开账号，快速生成结构化画像与 narrative 摘要。'
+              : '在本地维护 cluster 草稿、审阅 suggestion，再把当前账号集合送入聚合分析。'}
+          </p>
 
-      <section style={panelStyle}>
-        <p style={subSectionTitleStyle}>
-          {draft.mode === 'SINGLE_ACCOUNT' ? 'Single Account Input' : 'Manual Cluster Builder'}
-        </p>
-        <h2 style={sectionTitleStyle}>
-          {draft.mode === 'SINGLE_ACCOUNT' ? '输入一个账号开始分析' : '配置一个本地聚合分析主体'}
-        </h2>
-
-        <form onSubmit={handleAnalyze} style={{ display: 'grid', gap: 18 }}>
+          <form onSubmit={handleAnalyze} style={{ display: 'grid', gap: 18 }}>
           {draft.mode === 'SINGLE_ACCOUNT' ? (
             <>
               <fieldset style={fieldsetStyle}>
@@ -616,8 +608,58 @@ export function AnalyzeForm() {
                 : '聚合模式会把当前去重后的 accounts[] 直接作为 cluster 输入提交。'}
             </span>
           </div>
-        </form>
-      </section>
+          </form>
+        </section>
+
+        <div style={{ display: 'grid', gap: 22 }}>
+          <section style={emphasizedPanelStyle}>
+            <p style={subSectionTitleStyle}>Mode Switch</p>
+            <h2 style={sectionTitleStyle}>分析模式</h2>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+              {(['SINGLE_ACCOUNT', 'MANUAL_CLUSTER'] as AnalyzeMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => handleModeChange(mode)}
+                  style={segmentedButtonStyle(draft.mode === mode, isBusy)}
+                >
+                  {mode === 'SINGLE_ACCOUNT' ? '单账号分析' : '手工聚合分析'}
+                </button>
+              ))}
+            </div>
+            <p style={mutedTextStyle}>
+              单账号模式适合直接查看一个公开账号的画像。手工聚合模式会把多个账号草稿当作一个本地 cluster，支持 suggestion 审阅与 cluster-aware 结果阅读。
+            </p>
+          </section>
+
+          <section style={panelStyle}>
+            <p style={subSectionTitleStyle}>Workflow Status</p>
+            <h2 style={sectionTitleStyle}>当前工作流状态</h2>
+            <div style={infoGridStyle}>
+              <div style={itemCardStyle(draft.mode === 'MANUAL_CLUSTER' ? 'accent' : 'default')}>
+                <div style={subSectionTitleStyle}>草稿模式</div>
+                <div style={metaValueStyle}>
+                  {draft.mode === 'MANUAL_CLUSTER' ? '聚合' : '单账号'}
+                </div>
+              </div>
+              <div style={itemCardStyle(statusTone(suggestStatus))}>
+                <div style={subSectionTitleStyle}>Suggestion</div>
+                <div style={metaValueStyle}>{suggestStatus}</div>
+              </div>
+              <div style={itemCardStyle(statusTone(analyzeStatus))}>
+                <div style={subSectionTitleStyle}>Analyze</div>
+                <div style={metaValueStyle}>{analyzeStatus}</div>
+              </div>
+            </div>
+            {localMessage && (
+              <div style={{ ...insetPanelStyle, marginTop: 16 }}>
+                <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Local Note</p>
+                <p style={mutedTextStyle}>{localMessage}</p>
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
 
       {draft.mode === 'MANUAL_CLUSTER' && (
         <SuggestionPanel
@@ -630,33 +672,6 @@ export function AnalyzeForm() {
           result={suggestionResult}
         />
       )}
-
-      <section style={panelStyle}>
-        <p style={subSectionTitleStyle}>Workflow Status</p>
-        <h2 style={sectionTitleStyle}>当前工作流状态</h2>
-        <div style={infoGridStyle}>
-          <div style={itemCardStyle(draft.mode === 'MANUAL_CLUSTER' ? 'accent' : 'default')}>
-            <div style={subSectionTitleStyle}>草稿模式</div>
-            <div style={metaValueStyle}>
-              {draft.mode === 'MANUAL_CLUSTER' ? '聚合' : '单账号'}
-            </div>
-          </div>
-          <div style={itemCardStyle(statusTone(suggestStatus))}>
-            <div style={subSectionTitleStyle}>Suggestion</div>
-            <div style={metaValueStyle}>{suggestStatus}</div>
-          </div>
-          <div style={itemCardStyle(statusTone(analyzeStatus))}>
-            <div style={subSectionTitleStyle}>Analyze</div>
-            <div style={metaValueStyle}>{analyzeStatus}</div>
-          </div>
-        </div>
-        {localMessage && (
-          <div style={{ ...insetPanelStyle, marginTop: 16 }}>
-            <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Local Note</p>
-            <p style={mutedTextStyle}>{localMessage}</p>
-          </div>
-        )}
-      </section>
 
       {analyzeError && (
         <section style={errorPanelStyle}>

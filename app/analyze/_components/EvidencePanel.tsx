@@ -48,14 +48,16 @@ export function EvidencePanel({ result }: EvidencePanelProps) {
                   </strong>
                 </div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <span>{item.community ?? 'N/A'}</span>
+                  <span style={{ padding: '4px 10px', borderRadius: 999, background: 'var(--surface-pill)' }}>
+                    {item.community ?? 'N/A'}
+                  </span>
                   <span>{formatDateTime(item.publishedAt)}</span>
                 </div>
               </div>
               <p style={{ marginTop: 0, marginBottom: 12, lineHeight: 1.82 }}>
                 {item.excerpt ?? 'N/A'}
               </p>
-              <p style={{ marginBottom: 0 }}>
+              <p style={{ marginBottom: 0, fontWeight: 600 }}>
                 {item.activityUrl ? (
                   <a href={item.activityUrl} target="_blank" rel="noreferrer">
                     打开原始活动

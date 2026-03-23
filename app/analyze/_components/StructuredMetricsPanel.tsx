@@ -5,8 +5,8 @@ import {
   metricCardStyle,
   metricGridStyle,
   mutedTextStyle,
-  panelStyle,
   sectionTitleStyle,
+  subSectionTitleStyle,
 } from '@/app/analyze/_components/resultUi';
 
 type StructuredMetricsPanelProps = {
@@ -23,16 +23,17 @@ const metricItems = [
 
 export function StructuredMetricsPanel({ result }: StructuredMetricsPanelProps) {
   return (
-    <section style={panelStyle}>
-      <h2 style={sectionTitleStyle}>Structured Metrics</h2>
-      <p style={{ ...mutedTextStyle, marginBottom: 14 }}>
-        这些指标保持结构化可读，作为 narrative 之外的直接事实锚点。
-      </p>
+    <section style={{ display: 'grid', gap: 14 }}>
+      <div>
+        <p style={{ ...subSectionTitleStyle, marginBottom: 8 }}>Analysis Overview</p>
+        <h2 style={{ ...sectionTitleStyle, marginBottom: 6 }}>Structured Metrics</h2>
+        <p style={mutedTextStyle}>这些指标继续作为 narrative 之外的直接事实锚点。</p>
+      </div>
       <div style={metricGridStyle}>
         {metricItems.map((item) => (
           <div key={item.key} style={metricCardStyle}>
-            <div style={{ ...mutedTextStyle, fontSize: 13 }}>{item.label}</div>
-            <strong style={{ fontSize: 20 }}>
+            <div style={{ ...mutedTextStyle, fontSize: 13, marginBottom: 10 }}>{item.label}</div>
+            <strong style={{ fontSize: 22, letterSpacing: '-0.05em' }}>
               {formatValue(result.metrics?.[item.key])}
             </strong>
           </div>

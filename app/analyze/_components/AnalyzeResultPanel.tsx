@@ -20,6 +20,7 @@ export function AnalyzeResultPanel({
 }: AnalyzeResultPanelProps) {
   return (
     <div style={{ display: 'grid', gap: 20 }}>
+      <StructuredMetricsPanel result={result} />
       <NarrativeSummaryPanel
         mode={mode}
         result={result}
@@ -28,7 +29,6 @@ export function AnalyzeResultPanel({
       <CaveatsPanel result={result} />
       <ClusterInsightsPanel mode={mode} result={result} />
       <EvidencePanel result={result} />
-      <StructuredMetricsPanel result={result} />
       <CommunityInsightsPanel result={result} />
     </div>
   );

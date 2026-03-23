@@ -15,8 +15,7 @@ export const panelStyle: CSSProperties = {
 export const emphasizedPanelStyle: CSSProperties = {
   ...panelStyle,
   borderColor: 'var(--border-accent-soft)',
-  background:
-    'linear-gradient(180deg, rgba(255,154,60,0.12) 0%, rgba(19,17,15,0.98) 36%, rgba(16,14,13,0.98) 100%)',
+  background: 'var(--surface-accent-card)',
 };
 
 export const insetPanelStyle: CSSProperties = {
@@ -31,15 +30,13 @@ export const insetPanelStyle: CSSProperties = {
 export const cautionPanelStyle: CSSProperties = {
   ...panelStyle,
   borderColor: 'rgba(255, 153, 60, 0.26)',
-  background:
-    'linear-gradient(180deg, rgba(255,153,60,0.13) 0%, rgba(31,20,15,0.94) 100%)',
+  background: 'var(--surface-warning-card)',
 };
 
 export const errorPanelStyle: CSSProperties = {
   ...panelStyle,
   borderColor: 'rgba(255, 107, 74, 0.34)',
-  background:
-    'linear-gradient(180deg, rgba(255,107,74,0.14) 0%, rgba(31,16,14,0.96) 100%)',
+  background: 'var(--surface-error-card)',
 };
 
 export const sectionTitleStyle: CSSProperties = {
@@ -109,13 +106,13 @@ export const metricGridStyle: CSSProperties = {
 };
 
 export const metricCardStyle: CSSProperties = {
-  padding: 16,
+  padding: 18,
   borderRadius: 'var(--radius-lg)',
-  background: 'var(--surface-muted)',
+  background: 'var(--surface-card)',
   borderWidth: 1,
   borderStyle: 'solid',
   borderColor: 'var(--border-soft)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+  boxShadow: 'var(--shadow-card)',
 };
 
 export function buttonStyle(
@@ -143,26 +140,27 @@ export function buttonStyle(
   if (kind === 'primary') {
     return {
       ...base,
-      background: 'linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%)',
-      color: '#190e06',
-      boxShadow: disabled ? 'none' : '0 12px 28px rgba(255,122,44,0.2)',
+      background: 'var(--button-primary-bg)',
+      color: 'var(--button-primary-text)',
+      borderColor: 'var(--button-primary-border)',
+      boxShadow: disabled ? 'none' : '0 10px 24px rgba(0,0,0,0.12)',
     };
   }
 
   if (kind === 'danger') {
     return {
       ...base,
-      background: 'rgba(255,107,74,0.14)',
-      borderColor: 'rgba(255,107,74,0.3)',
-      color: '#ffd9cf',
+      background: 'var(--button-danger-bg)',
+      borderColor: 'var(--button-danger-border)',
+      color: 'var(--button-danger-text)',
     };
   }
 
   return {
     ...base,
-    background: 'var(--surface-muted)',
-    borderColor: 'var(--border-soft)',
-    color: 'var(--text-primary)',
+    background: 'var(--button-secondary-bg)',
+    borderColor: 'var(--button-secondary-border)',
+    color: 'var(--button-secondary-text)',
   };
 }
 
@@ -191,11 +189,11 @@ export const selectStyle: CSSProperties = {
 export function segmentedButtonStyle(active: boolean, disabled = false): CSSProperties {
   return {
     ...pillBaseStyle,
-    minHeight: 42,
-    padding: '10px 14px',
-    background: active ? 'rgba(255,154,60,0.16)' : 'var(--surface-pill)',
-    borderColor: active ? 'var(--border-accent-soft)' : 'var(--border-soft)',
-    color: active ? 'var(--accent)' : 'var(--text-secondary)',
+    minHeight: 44,
+    padding: '10px 16px',
+    background: active ? 'var(--button-primary-bg)' : 'var(--surface-pill)',
+    borderColor: active ? 'var(--button-primary-border)' : 'var(--border-soft)',
+    color: active ? 'var(--button-primary-text)' : 'var(--text-secondary)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     opacity: disabled ? 0.55 : 1,
     fontWeight: active ? 700 : 600,
@@ -222,8 +220,7 @@ export function itemCardStyle(tone: 'default' | 'accent' | 'warning' = 'default'
     return {
       ...style,
       borderColor: 'var(--border-accent-soft)',
-      background:
-        'linear-gradient(180deg, rgba(255,154,60,0.08) 0%, rgba(21,18,16,0.96) 100%)',
+      background: 'var(--surface-accent-card)',
     };
   }
 
@@ -231,8 +228,7 @@ export function itemCardStyle(tone: 'default' | 'accent' | 'warning' = 'default'
     return {
       ...style,
       borderColor: 'rgba(255, 153, 60, 0.26)',
-      background:
-        'linear-gradient(180deg, rgba(255,153,60,0.1) 0%, rgba(28,19,15,0.96) 100%)',
+      background: 'var(--surface-warning-card)',
     };
   }
 

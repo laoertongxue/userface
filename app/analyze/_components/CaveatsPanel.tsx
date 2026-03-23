@@ -55,7 +55,7 @@ export function CaveatsPanel({ result }: CaveatsPanelProps) {
       {explicitCaveat && (
         <div style={{ ...itemCardStyle('warning'), marginBottom: warnings.length > 0 || narrativeWarnings.length > 0 ? 14 : 0 }}>
           <p style={{ margin: 0, lineHeight: 1.8, color: 'var(--text-primary)' }}>
-            <strong>Caveat:</strong> {explicitCaveat}
+            <strong>叙事提示：</strong> {explicitCaveat}
           </p>
         </div>
       )}
